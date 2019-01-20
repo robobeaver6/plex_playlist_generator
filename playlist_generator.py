@@ -23,16 +23,16 @@ def get_args():
     parser = argparse.ArgumentParser(description='Create playlist of unwatched episodes from random shows '
                                                  'but in correct episode order.')
     parser.add_argument('--name', help='Playlist Name', default='Random Season, Next Unwatched')
-    parser.add_argument('--number', '-n', help='Number of episodes to add to play list', default=10)
+    parser.add_argument('--number', '-n', help='Number of episodes to add to play list', type=int, default=10)
     group_server = parser.add_argument_group('Server Connection Method')
     group_server.add_argument('--server', action='store_true', help='Server connection Method')
-    group_server.add_argument('--baseurl', '-b', help='Base URL of Server', default=10)
-    group_server.add_argument('--token', '-t', help='Authentication Token', default=10)
+    group_server.add_argument('--baseurl', '-b', help='Base URL of Server')
+    group_server.add_argument('--token', '-t', help='Authentication Token')
     group_account = parser.add_argument_group('Plex Account Connection Method')
     group_account.add_argument('--account', action='store_true', help='Account Connection Method')
-    group_account.add_argument('--username', '-u', help='Plex Account Username', default=10)
-    group_account.add_argument('--password', '-p', help='Plex AccountPassword', default=10)
-    group_account.add_argument('--resource', '-r', help='Resource Name (Plex Server Name)', default=10)
+    group_account.add_argument('--username', '-u', help='Plex Account Username')
+    group_account.add_argument('--password', '-p', help='Plex AccountPassword')
+    group_account.add_argument('--resource', '-r', help='Resource Name (Plex Server Name)')
     parser.add_argument('--debug', '-d', help='Debug Logging', action="store_true")
     return parser.parse_args()
 
@@ -125,7 +125,7 @@ def main():
     all_shows = plex.library.section('TV Shows')
 
     # shows = get_unwatched_shows(all_shows.all())
-    episodes = get_random_episodes(all_shows, n=int(args.number))
+    episodes = get_random_episodes(all_shows, n=args.number)
     for episode in episodes:
         season_episode = episode.seasonEpisode
         # skipped = skipped_missing(all_shows.get(title=episode.grandparentTitle), episode)
