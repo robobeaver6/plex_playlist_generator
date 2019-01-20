@@ -125,7 +125,7 @@ def main():
     all_shows = plex.library.section('TV Shows')
 
     # shows = get_unwatched_shows(all_shows.all())
-    episodes = get_random_episodes(all_shows, n=args.number)
+    episodes = get_random_episodes(all_shows, n=int(args.number))
     for episode in episodes:
         season_episode = episode.seasonEpisode
         # skipped = skipped_missing(all_shows.get(title=episode.grandparentTitle), episode)
