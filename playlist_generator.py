@@ -12,7 +12,6 @@ logging.basicConfig()
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-PL_TITLE = 'Random Season, Next Unwatched'
 # list of series to never include
 BLACKLIST = ['Downton Abbey',
              'Poldark (2015)'
@@ -133,7 +132,10 @@ def main():
               f'{episode.index}. {episode.title}')
 
     # playlist = Playlist(plex, )
-    plex.playlist(title=args.name).delete()
+    try:
+        plex.playlist(title=args.name).delete()
+    except NotFound as e:
+        logger.debug(f"Playlist {args.name} does not exist to delete.")
     Playlist.create(server=plex, title=args.name, items=episodes)
 
 
