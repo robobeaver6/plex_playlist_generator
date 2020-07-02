@@ -12,6 +12,8 @@ logging.basicConfig()
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+args = None
+
 # list of series to never include
 BLACKLIST = ['Downton Abbey',
              'Poldark (2015)'
@@ -32,6 +34,9 @@ def get_args():
     group_account.add_argument('--username', '-u', help='Plex Account Username')
     group_account.add_argument('--password', '-p', help='Plex AccountPassword')
     group_account.add_argument('--resource', '-r', help='Resource Name (Plex Server Name)')
+    group_server.add_argument('--ignore-skipped', action='store_true', help="Don't test for missing episodes")
+    group_server.add_argument('--randomize', action='store_true', help='Randomize selected episodes, not next unwatched')
+    group_server.add_argument('--include-watched', action='store_true', help='include watched episodes (use with --randomize')
     parser.add_argument('--debug', '-d', help='Debug Logging', action="store_true")
     return parser.parse_args()
 
@@ -39,7 +44,7 @@ def get_args():
 def get_random_episodes(all_shows, n=10):
     show_episodes = dict()
     for show in all_shows.all():
-        if show.isWatched:
+        if show.isWatched and args.include_watched is not True:
             continue
         if show.title in BLACKLIST:
             logger.debug(f'GET_EPISODES: Show Blacklisted: {show.title}')
@@ -56,8 +61,10 @@ def get_random_episodes(all_shows, n=10):
     while len(next_n) < n:
         show_name = random.choice(list(show_episodes.keys()))
         if len(show_episodes[show_name]) >0:
-            if skipped_missing(all_shows.get(title=show_name), show_episodes[show_name][0]):
+            if skipped_missing(all_shows.get(title=show_name), show_episodes[show_name][0]) and args.ignore_skipped:
                 continue
+            if args.randomize:
+                random.shuffle(show_episodes[show_name])
             next_n.append(show_episodes[show_name].pop(0))
         else:
             logger.debug(f'GET_EPISODES: No more unwatched episodes for {show_name}')
@@ -106,6 +113,7 @@ def skipped_missing(show, episode):
 
 
 def main():
+    global args
     args = get_args()
     if args.debug:
         logger.setLevel(logging.DEBUG)
