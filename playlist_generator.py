@@ -44,28 +44,37 @@ def get_args():
 def get_random_episodes(all_shows, n=10):
     show_episodes = dict()
     for show in all_shows.all():
-        if args.include_watched is True and args.randomize is False:
-            logger.warning("Setting --randomized flag, or playlist will always start at Episode 1 for each series")
-            args.randomize = True
+        if args.include_watched is True:
+            if args.randomize is False:
+                logger.warning("Setting --randomized flag, or playlist will always start at Episode 1 for each series")
+                args.randomize = True
+            if args.ignore_skipped is False:
+                logger.warning("Setting --ignore-skipped flag, missing episode check is not compatible with --randomized option flag")
+                args.ignore_skipped = True
+
         if show.isWatched and args.include_watched is not True:
             continue
         if show.title in BLACKLIST:
             logger.debug(f'GET_EPISODES: Show Blacklisted: {show.title}')
             continue
-        show_episodes[show.title] = show.unwatched()
+        if args.include_watched is True:
+            show_episodes[show.title] = show.episodes()
+        else:
+            show_episodes[show.title] = show.unwatched()
         # remove series 0 specials
         while show_episodes[show.title][0].seasonNumber == 0:
             season_episode = show_episodes[show.title][0].seasonEpisode
             episode_title = show_episodes[show.title][0].seasonEpisode
             show_episodes[show.title].pop(0)
-            logger.debug(f'GET_EPISODES: Series 0 Episode Removed '
+            logger.debug(f'get_random_episodes: Series 0 Episode Removed '
                          f'{show.title} - {episode_title} - {season_episode}')
     next_n = []
     while len(next_n) < n:
         show_name = random.choice(list(show_episodes.keys()))
         if len(show_episodes[show_name]) >0:
-            if skipped_missing(all_shows.get(title=show_name), show_episodes[show_name][0]) and args.ignore_skipped:
-                continue
+            if args.ignore_skipped is False:
+                if skipped_missing(all_shows.get(title=show_name), show_episodes[show_name][0]):
+                    continue
             if args.randomize:
                 random.shuffle(show_episodes[show_name])
             next_n.append(show_episodes[show_name].pop(0))
