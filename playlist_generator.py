@@ -34,9 +34,10 @@ def get_args():
     group_account.add_argument('--username', '-u', help='Plex Account Username')
     group_account.add_argument('--password', '-p', help='Plex AccountPassword')
     group_account.add_argument('--resource', '-r', help='Resource Name (Plex Server Name)')
-    group_server.add_argument('--ignore-skipped', action='store_true', help="Don't test for missing episodes")
-    group_server.add_argument('--randomize', action='store_true', help='Randomize selected episodes, not next unwatched')
-    group_server.add_argument('--include-watched', action='store_true', help='include watched episodes (use with --randomize')
+    group_behaviour = parser.add_argument_group('Episode Selection Behaviour')
+    group_behaviour.add_argument('--ignore-skipped', action='store_true', help="Don't test for missing episodes")
+    group_behaviour.add_argument('--randomize', action='store_true', help='Randomize selected episodes, not next unwatched')
+    group_behaviour.add_argument('--include-watched', action='store_true', help='include watched episodes (use with --randomize')
     parser.add_argument('--debug', '-d', help='Debug Logging', action="store_true")
     return parser.parse_args()
 
@@ -127,6 +128,7 @@ def skipped_missing(show, episode):
 def main():
     global args
     args = get_args()
+    plex = None
     if args.debug:
         logger.setLevel(logging.DEBUG)
     if args.account:

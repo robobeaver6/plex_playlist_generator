@@ -5,30 +5,36 @@ series in order
 
 ##Usage
 ```
-playlist_generator.py [-h] [--name NAME] [--number NUMBER] [--server]
+usage: playlist_generator.py [-h] [--name NAME] [--number NUMBER] [--server]
                              [--baseurl BASEURL] [--token TOKEN] [--account]
                              [--username USERNAME] [--password PASSWORD]
-                             [--resource RESOURCE] [--debug]
+                             [--resource RESOURCE] [--ignore-skipped]
+                             [--randomize] [--include-watched] [--debug]
 
 Create playlist of unwatched episodes from random shows but in correct episode
 order.
 
 optional arguments:
-  -h, --help                         show this help message and exit
-  --name NAME                        Playlist Name
-  --number NUMBER, -n NUMBER         Number of episodes to add to play list
-  --debug, -d                        Debug Logging
+  -h, --help                    show this help message and exit
+  --name NAME                   Playlist Name
+  --number NUMBER, -n NUMBER    Number of episodes to add to play list
+  --debug, -d                   Debug Logging
 
 Server Connection Method:
-  --server                           Server connection Method
-  --baseurl BASEURL, -b BASEURL      Base URL of Server
-  --token TOKEN, -t TOKEN            Authentication Token
+  --server                      Server connection Method
+  --baseurl BASEURL, -b BASEURL Base URL of Server
+  --token TOKEN, -t TOKEN   Authentication Token
 
 Plex Account Connection Method:
-  --account                          Account Connection Method
+  --account              Account Connection Method
   --username USERNAME, -u USERNAME   Plex Account Username
   --password PASSWORD, -p PASSWORD   Plex AccountPassword
-  --resource RESOURCE, -r RESOURCE   Resource Name (Plex Server Name) 
+  --resource RESOURCE, -r RESOURCE   Resource Name (Plex Server Name)
+
+Episode Selection Behaviour:
+  --ignore-skipped      Don't test for missing episodes
+  --randomize           Randomize selected episodes, not next unwatched
+  --include-watched     include watched episodes (use with --randomize
 ```
 ## Connection Methods
 ### Account
