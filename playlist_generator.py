@@ -44,6 +44,9 @@ def get_args():
 def get_random_episodes(all_shows, n=10):
     show_episodes = dict()
     for show in all_shows.all():
+        if args.include_watched is True and args.randomize is False:
+            logger.warning("Setting --randomized flag, or playlist will always start at Episode 1 for each series")
+            args.randomize = True
         if show.isWatched and args.include_watched is not True:
             continue
         if show.title in BLACKLIST:
