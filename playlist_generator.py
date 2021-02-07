@@ -1,5 +1,8 @@
 import argparse
 import random
+
+import certifi
+import requests
 from plexapi.myplex import MyPlexAccount
 from plexapi.server import PlexServer
 from plexapi.playlist import Playlist
@@ -7,10 +10,12 @@ from plexapi.exceptions import NotFound
 import tvdb_api
 import re
 import logging
+import urllib3
 
 logging.basicConfig()
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 args = None
 
@@ -34,6 +39,7 @@ def get_args():
     group_account.add_argument('--username', '-u', help='Plex Account Username')
     group_account.add_argument('--password', '-p', help='Plex AccountPassword')
     group_account.add_argument('--resource', '-r', help='Resource Name (Plex Server Name)')
+    group_account.add_argument('--tvdb-api-key', help='TVDB API Key)')
     group_behaviour = parser.add_argument_group('Episode Selection Behaviour')
     group_behaviour.add_argument('--ignore-skipped', action='store_true', help="Don't test for missing episodes")
     group_behaviour.add_argument('--randomize', action='store_true', help='Randomize selected episodes, not next unwatched')
@@ -86,10 +92,14 @@ def get_random_episodes(all_shows, n=10):
 
 
 def tvdb_season_count(show, season):
+    tvdb_id = None
     try:
         logger.debug(f'TVDB: Getting show "{show.title}"')
         tvdb_id = int(re.search('thetvdb://([0-9]+)?', show.guid).group(1))
-        tv = tvdb_api.Tvdb(language='en')
+        if args.tvdb_api_key is None:
+            raise RuntimeError(f'TVDB now requires an API key.  Instructions on how to set it up are here:\n\n'
+                               f'https://koditips.com/create-tvdb-api-key-tv-database/')
+        tv = tvdb_api.Tvdb(language='en', apikey=args.tvdb_api_key)
         season_list = tv[tvdb_id][season]
         logger.debug(f'TVDB: Previous Season Length = {len(season_list)}')
         return len(season_list)
@@ -139,7 +149,10 @@ def main():
         # ## Connect via Direct URL
         baseurl = args.baseurl
         token = args.token
-        plex = PlexServer(baseurl, token)
+        session = requests.session()
+        session.verify = False
+        logger.debug(session.verify)
+        plex = PlexServer(baseurl, token, session)
     else:
         exit(1)
 
