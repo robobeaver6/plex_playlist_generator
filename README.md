@@ -5,57 +5,58 @@ series in order
 
 ##Usage
 ```
-usage: playlist_generator.py [-h] [--name NAME] [--number NUMBER] [--server]
-                             [--baseurl BASEURL] [--token TOKEN] [--account]
+usage: playlist_generator.py [-h] [--name NAME] [--number NUMBER] [--debug]
+                             [--server] [--baseurl BASEURL] [--token TOKEN] [--account]
                              [--username USERNAME] [--password PASSWORD]
-                             [--resource RESOURCE] [--ignore-skipped]
-                             [--randomize] [--include-watched] [--homeusers]
-                             [--adminuser] [--purge] [--select-library]
-                             [--allshows] [--allmovies] [--exclude-library] [--debug]
+                             [--resource RESOURCE] [--tvdb-api-key TVDB_API_KEY]
+                             [--ignore-skipped] [--randomize] [--include-watched]
+                             [--allshows] [--allmovies] [--select-library SELECT_LIBRARY]
+                             [--exclude-library EXCLUDE_LIBRARY] [--purge] [--adminuser]
+                             [--homeusers HOMEUSERS]
 
 Create playlist of unwatched episodes from random shows but in correct episode
 order.
 
 optional arguments:
-  -h, --help                    show this help message and exit
-  --name NAME                   Playlist Name
-  --number NUMBER, -n NUMBER    Number of episodes to add to play list
-  --debug, -d                   Debug Logging
+  -h, --help            show this help message and exit
+  --name NAME           Playlist Name
+  --number NUMBER, -n NUMBER
+                        Number of episodes or Movies to add to play list
+  --debug, -d           Debug Logging
 
 Server Connection Method:
-  --server                      Server connection Method
-  --baseurl BASEURL, -b BASEURL Base URL of Server
-  --token TOKEN, -t TOKEN   Authentication Token
+  --server              Server connection Method
+  --baseurl BASEURL, -b BASEURL
+                        Base URL of Server (I.E "http://10.1.1.8:32400" or "https://your.domain.com:32400")
+  --token TOKEN, -t TOKEN
+                        Authentication Token
 
 Plex Account Connection Method:
-  --account              Account Connection Method
-  --username USERNAME, -u USERNAME   Plex Account Username
-  --password PASSWORD, -p PASSWORD   Plex AccountPassword
-  --resource RESOURCE, -r RESOURCE   Resource Name (Plex Server Name)
+  --account             Account Connection Method
+  --username USERNAME, -u USERNAME
+                        Plex Account Username
+  --password PASSWORD, -p PASSWORD
+                        Plex Account Password
+  --resource RESOURCE, -r RESOURCE
+                        Resource Name (Plex Server Name)
+  --tvdb-api-key TVDB_API_KEY
+                        TVDB API Key)
 
-Episode Selection Behaviour:
+Episode/Movie Selection Behaviour:
   --ignore-skipped      Don't test for missing episodes
   --randomize           Randomize selected episodes, not next unwatched
-  --include-watched     include watched movies or episodes (use with --randomize
+  --include-watched     include watched movies or episodes (use with --randomize)
 
-Movie Selection Behavior:
-  --allmovies       Select All Videos from all library sections that are not TV Shows to use for building a playlist
+Library Selection Behavior:
+  --allshows             Grab All Shows in all Library sections From Plex
+  --allmovies            Grab All Movies in all Library sections From Plex
+  --select-library, -l   SELECT_LIBRARY   Choose between library sections of both TV Shows or Movies to build a playlist from (comma seperated within quotes if multiple users)
+  --exclude-library -e   EXCLUDE_LIBRARY  Comma seperated list (if selecting multiple users) of sections to exclude (I.E. "Test Videos,Workout,Home Videos" ) there should be no space between the comma and the first character of the next value
+  --purge                Remove a playlist from plex for the provided user(s)
 
-TV Show Selection Behavior:
-  --allshows        Select All TV Shows from all library sections to use for building a playlist
-
-Select libraries to build playlist from.
-  --select-library  Choose between library sections of both TV Shows or Movies to build a playlist from
-
-Exclude Certain Library 
-  --exclude-library   Exclude specific libraies that the script should not build playlist of any kind from
-
-Remove a Playlist from Plex
-  --purge    Remove a playlist from plex for the provided user(s)
-
-Select What Users to Apply the playlist to
-  --adminuser, -a               The Plex Admin profile name
-  --homeusers      HOMEUSERS    The Profile names for the home users (comma seperated within quotes if multiple users)
+User Profile Selection:
+  --adminuser, -a        Generate playlist for the Plex Admin user profile name that was used to login.
+  --homeusers HOMEUSERS  Generate playlist for the provided Plex home users (comma seperated within quotes if multiple users). For all plex home users type "all"
 
 ```
 ## Connection Methods
@@ -70,3 +71,37 @@ e.g. `plex_playlist_generator.py --server --baseurl "http://172.16.1.100:32400" 
 ### Authentication Token
 To get your Auth token, browse to an episode in the web UI. Click on the `...` video and select `Get Info`.  In the 
 popup window select `View XML` in the URL there is the `X-Plex-Token=XXXXXXXXXXXXXX`
+
+### Library Selection
+Uses the either the Account Method or Server Method to generate playlist of movies and/or TV Shows
+Note any of the below commands can be run by either connection method (Server/Account). 
+The default behavior of the script for TV Shows is that if its a show a user has began watchhing the script will begin with the episode you are currently on.
+e.g of some of the possible commands. 
+
+Generate 10 random unwatched TV Show episodes:  
+    `plex_playlist_generator.py --server --baseurl "http://172.16.1.100:32400" --token "fR5GrDxfLunKynNub5" --allshows --homeusers John`
+
+Generate 10 random unwatched epsidodes for the 3 provided homeusers (Johnny,Smith,Curry): 
+    `plex_playlist_generator.py --account --username MyUserName --password Sh1tPass --resource MyServer --allshows --homeusers "John,Smith,Curry" --excludeilibrary "TV Shows,Movies"`
+
+Generate 10 random unwatched movies for the admin user:
+    `plex_playlist_generator.py --server --baseurl "http://172.16.1.100:32400" --token "fR5GrDxfLunKynNub5" --allmovies --admin`
+
+Generate 5 random unwatched Movies for the 3 provided homeusers (Johnny,Smith,Curry): 
+  `plex_playlist_generator.py --account --username MyUserName --password Sh1tPass --resource MyServer --allmovies --admin --homeusers "John,Smith,Curry" --number 5`
+
+Generate 3 random unwatched epsidodes for all home users on the plex server:
+    `plex_playlist_generator.py --server --baseurl "http://172.16.1.100:32400" --token "fR5GrDxfLunKynNub5" --allmovies --admin --homeusers all --number 3`
+
+Ignore The facty that not all episodes are available for a show in your library [highly recommend using to reduce processing time]
+    `plex_playlist_generator.py --account --username MyUserName --password Sh1tPass --resource MyServer --allmovies --admin --homeusers "all" --ignore-skipped`
+
+Generate a mix 8 random shows and movies:
+    `plex_playlist_generator.py --server --baseurl "http://172.16.1.100:32400" --token "fR5GrDxfLunKynNub5" --allmovies --homeusers --allshows --allmovies` --number 8`
+
+Generate a playlist with the name "Test1" for all home users:
+`plex_playlist_generator.py --account --username MyUserName --password Sh1tPass --resource MyServer --allmovies --admin --homeusers "all" --name "Test1"`
+
+Delete a playlist with the name "Test1" for all home users:
+    `plex_playlist_generator.py --account --username MyUserName --password Sh1tPass --resource MyServer --allmovies --admin --homeusers "all" --purge`
+
