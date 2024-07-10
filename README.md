@@ -5,14 +5,14 @@ series in order
 
 ##Usage
 ```
-usage: playlist_generator.py [-h] [--name NAME] [--number NUMBER] [--debug]
-                             [--server] [--baseurl BASEURL] [--token TOKEN] [--account]
-                             [--username USERNAME] [--password PASSWORD]
-                             [--resource RESOURCE] [--tvdb-api-key TVDB_API_KEY]
-                             [--ignore-skipped] [--randomize] [--include-watched]
-                             [--allshows] [--allmovies] [--select-library SELECT_LIBRARY]
-                             [--exclude-library EXCLUDE_LIBRARY] [--purge] [--adminuser]
-                             [--homeusers HOMEUSERS]
+usage: plex_playlist_generator.py [-h] [--name NAME] [--number NUMBER] [--debug]
+                                  [--server] [--baseurl BASEURL] [--token TOKEN] [--account]
+                                  [--username USERNAME] [--password PASSWORD]
+                                  [--resource RESOURCE] [--tvdb-api-key TVDB_API_KEY]
+                                  [--ignore-skipped] [--randomize] [--include-watched]
+                                  [--allshows] [--allmovies] [--select-library SELECT_LIBRARY]
+                                  [--exclude-library EXCLUDE_LIBRARY] [--purge] [--adminuser]
+                                  [--homeusers HOMEUSERS]
 
 Create playlist of unwatched episodes from random shows but in correct episode
 order.
