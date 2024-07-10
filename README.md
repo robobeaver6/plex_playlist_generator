@@ -80,10 +80,14 @@ To get your Auth token, browse to an episode in the web UI. Click on the `...` v
 popup window select `View XML` in the URL there is the `X-Plex-Token=XXXXXXXXXXXXXX`
 
 ### Library Selection
-Uses the either the Account Method or Server Method to generate playlist of movies and/or TV Shows
-Note any of the below commands can be run by either connection method (Server/Account). 
+Uses either the Account Method or Server Method to generate playlist of movies and/or TV Shows
+>
+>Note: any of the below commands can be run by either connection method (Server/Account).
+>
 The default behavior of the script for TV Shows is that if its a show a user has began watchhing the script will begin with the episode you are currently on.
-e.g of some of the possible commands. 
+
+
+### Examples:
 
 Generate 10 random unwatched TV Show episodes:  
     `plex_playlist_generator.py --server --baseurl "http://172.16.1.100:32400" --token "fR5GrDxfLunKynNub5" --allshows --homeusers John`
