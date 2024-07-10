@@ -59,6 +59,10 @@ User Profile Selection:
   --homeusers HOMEUSERS  Generate playlist for the provided Plex home users (comma seperated within quotes if multiple users). For all plex home users type "all"
 
 ```
+### Install dependencies
+NOTE: Recommended: Use a virtual env
+`pip install Pipfile`
+
 ## Connection Methods
 ### Account
 Uses your PlexTV Account, username and Resource Name (Server Name)  
