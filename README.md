@@ -60,8 +60,11 @@ User Profile Selection:
 
 ```
 ### Install dependencies
-NOTE: Recommended: Use a virtual env
-`pip install Pipfile`
+> **NOTE:**
+>
+> Recommend Using a virtual env
+>
+> `pip install Pipfile`
 
 ## Connection Methods
 ### Account
