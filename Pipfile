@@ -8,7 +8,6 @@ verify_ssl = true
 [packages]
 plexapi = "*"
 tvdb_api = "*"
-xmltodict = "*"
 
 [requires]
 python_version = "3"
