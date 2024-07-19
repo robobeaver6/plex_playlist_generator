@@ -55,6 +55,8 @@ BLACKLIST = ['Downton Abbey',
 #                  - [Bug Fixes] Fixed a bug where passing a value into the --number argument that was larger than #
 #                    total possible number of media in the provided libraries would cause an infinite loop.        #
 #                  - [Removed] Removed default values for excludusion list (--exclude-library).                    #
+#                  - [Reverted] Reverted a change that removed the code for excluding special episodes/seasons.    #
+#                  - [Removed] Removed no longer needed code.                                                      #
 ####################################################################################################################
 
 
@@ -175,7 +177,15 @@ def get_random_episodes_or_movies(plex, all_provided_sections, requested_playlis
                 show_episodes[show.title] = show.episodes(parentIndex__gt=0)
             else:
                 show_episodes[show.title] = show.unwatched()
-
+            
+            # remove series 0 specials
+            while show_episodes[show.title][0].seasonNumber == 0:
+                season_episode = show_episodes[show.title][0].seasonEpisode
+                episode_title = show_episodes[show.title][0].seasonEpisode
+                show_episodes[show.title].pop(0)
+                logger.debug(f'get_random_episodes: Series 0 Episode Removed '
+                             f'{show.title} - {episode_title} - {season_episode}')
+    
 
     #Used to randomly choose between show or movies if both are supplied
     get_show = "show"
@@ -303,108 +313,6 @@ def get_random_episodes_or_movies(plex, all_provided_sections, requested_playlis
 
 
 
-#def get_random_episodes(all_shows, n=10):
-#def get_random_episodes(all_provided_sections, n=10):
-def get_random_episodes(plex, all_provided_sections, n=10):
-
-    #Used to determine whether to append to a empty library section all content, or add to concatinate an existing set of data
-    count = 0
-    
-    print(f'\nall_provided_sections = {all_provided_sections}\n')
-    for provided_section in all_provided_sections:
-        #all_shows_from_provided_sections.append(provided_section)
-        if count == 0:
-            all_shows_from_provided_sections = plex.library.section(provided_section).all()
-            print(f'\nall_shows_from_provided_sections[{count}] = {all_shows_from_provided_sections}')
-            count += 1
-        else:
-            all_shows_from_provided_sections = all_shows_from_provided_sections + plex.library.section(provided_section).all()
-            print(f'\nall_shows_from_provided_sections[{count}] = {all_shows_from_provided_sections}')
-            count += 1
-
-    
-    show_episodes = dict()
-    #for show in all_shows.all():
-    for show in all_shows_from_provided_sections:
-        if args.include_watched is True:
-            if args.randomize is False:
-                logger.warning("Setting --randomized flag, or playlist will always start at Episode 1 for each series")
-                args.randomize = True
-            if args.ignore_skipped is False:
-                logger.warning("Setting --ignore-skipped flag, missing episode check is not compatible with --randomized option flag")
-                args.ignore_skipped = True
-
-        if show.isWatched and args.include_watched is not True:
-            continue
-        if show.title in BLACKLIST:
-            logger.debug(f'GET_EPISODES: Show Blacklisted: {show.title}')
-            continue
-        if args.include_watched is True:
-            #show_episodes[show.title] = show.episodes()
-            #Grab Watched Episodes but ignore Season 0 (Specials)
-            show_episodes[show.title] = show.episodes(parentIndex__gt=0)
-        else:
-            show_episodes[show.title] = show.unwatched()
-
-        # remove series 0 specials
-        while show_episodes[show.title][0].seasonNumber == 0:
-            season_episode = show_episodes[show.title][0].seasonEpisode
-            episode_title = show_episodes[show.title][0].seasonEpisode
-            show_episodes[show.title].pop(0)
-            logger.debug(f'get_random_episodes: Series 0 Episode Removed '
-                         f'{show.title} - {episode_title} - {season_episode}')
-    next_n = []
-    while len(next_n) < n:
-        show_name = random.choice(list(show_episodes.keys()))
-
-        if len(show_episodes[show_name]) >0:
-            if args.ignore_skipped is False:
-                if skipped_missing(all_shows.get(title=show_name), show_episodes[show_name][0]):
-                    continue
-            if args.randomize:
-                random.shuffle(show_episodes[show_name])
-                
-            next_n.append(show_episodes[show_name].pop(0))
-
-        else:
-            logger.debug(f'GET_EPISODES: No more unwatched episodes for {show_name}')
-            continue
-    print(f'next_n = {next_n}')
-    return next_n
-    
-    
-def get_random_movies(all_movies, n=10):
-    movies_found = dict()
-    movies_found_list = list()
-    movies_found_key_list = list()
-    
-    movieCounter = 0
-
-    while len(movies_found_list) < n:
-        
-        #If the 
-        #if show.title in BLACKLIST:
-        if all_movies.title in BLACKLIST:
-            logger.debug(f'GET_EPISODES: Show Blacklisted: {show.title}')
-            continue
-        
-        if(args.include_watched == True):
-            #If the user selects to include watched movies
-            logger.debug(f'\nIncluding Watched Movies...\n')
-            movie = random.choice(all_movies.all())
-
-        else:
-            #If the user did not select to include watched movies with --include-watched
-            logger.debug(f'\nExcluding Unwatched Movies...\n')
-            movie = random.choice(all_movies.all(unwatched=True))
-
-        movies_found_list.append(movie)
-        
-    logger.debug(f'Returning list of movies: {movies_found_list}')
-    return movies_found_list
-
-
-
 def tvdb_season_count(show, season):
     tvdb_id = None
     try:
@@ -451,7 +359,7 @@ def skipped_missing(show, episode):
 
 def delete_playlist(plex, account, playlistName):
     try:
-        print(f'\ndeleting playlist \"{playlistName}\"...\n')
+        print(f'deleting playlist \"{playlistName}\"...')
         plex.playlist(title=playlistName).delete()
         print(f'\nplaylist \"{playlistName}\" deleted successfully.\n')
         
@@ -462,7 +370,7 @@ def delete_playlist(plex, account, playlistName):
     except NotFound:
         logger.debug(f"Playlist {playlistName} does not exist to delete.")
         
-        #If the user is deleting all instances of the playlist then sleeps are added to avoid hitting the too many request exception
+        #If the user is deleting all instances of the playlist (whether it exist or not on a users account) then sleeps are added to avoid hitting the too many request exception
         if(args.purge):
             time.sleep(10)
 
@@ -535,7 +443,7 @@ def build_playlist(plex, userName, plex_refined_library_sections, selectionsToEx
                 print('\n-----------------------------------')
                 print('[RANDOMIZED EPISODES]')
                 print(f'Username: {userName}')
-                print(f'Library Selection: {episode_movie.librarySectionTitle}\n')  
+                print(f'Library Selection: {episode_movie.librarySectionTitle}')  
 
                 #If no library sections are to be excluded print None for the excluded Library sections
                 if (not selectionsToExclude_List) or (args.exclude_library == ''):
@@ -607,7 +515,7 @@ def build_playlist(plex, userName, plex_refined_library_sections, selectionsToEx
                 print('\n-----------------------------------')
                 print('[RANDOMIZED EPISODES]')
                 print(f'Username: {userName}')
-                print(f'Library Selection: {episode_movie.librarySectionTitle}\n')  
+                print(f'Library Selection: {episode_movie.librarySectionTitle}')  
 
                 #If no library sections are to be excluded print None for the excluded Library sections
                 if (not selectionsToExclude_List) or (args.exclude_library == ''):
@@ -660,7 +568,7 @@ def build_playlist(plex, userName, plex_refined_library_sections, selectionsToEx
                 print('\n-----------------------------------')
                 print('[RANDOMIZED EPISODES]')
                 print(f'Username: {userName}')
-                print(f'Library Selection: {episode_movie.librarySectionTitle}\n')  
+                print(f'Library Selection: {episode_movie.librarySectionTitle}')  
 
                 #If no library sections are to be excluded print None for the excluded Library sections
                 if (not selectionsToExclude_List) or (args.exclude_library == ''):
@@ -1271,13 +1179,15 @@ def generate_all_users_playlist_via_server_method(base_url, authToken, homeUsers
 
             print(f'\n-----------[BEGIN]-------------- {adminUser} -------------[BEGIN]--------------')
             
-            print(f'Current User [Admin]: {adminUser}\n')
+            print(f'\nCurrent User [Admin]: {adminUser}')
 
             #If the --purge argument was passed in then delete the playlist if it exist
             if(args.purge == True):
                 delete_playlist(plex_server, adminUser, args.name)
             else:
-                create_playlist(plex_server, adminUser) 
+                print(f'Creating playlist \"{args.name}\" ...')
+                create_playlist(plex_server, adminUser)
+                print(f'\nPlaylist creation for user [{adminUser}] - COMPLETED\n')
             print(f'------------[END]------------- {adminUser} --------------[END]-------------\n')  
 
         except Unauthorized:
@@ -1297,14 +1207,15 @@ def generate_all_users_playlist_via_server_method(base_url, authToken, homeUsers
                 
                 runningAsUser = plex_server.myPlexAccount().switchHomeUser(user=plex_user, pin=None).resource(args.resource).connect()
                 
-                print(f'\nCurrent User [Home User]: {plex_user}\n\n')
+                print(f'\nCurrent User [Home User]: {plex_user}\n')
 
                 #If the --purge argument was passed in then delete the playlist if it exist
                 if(args.purge == True):
                     delete_playlist(runningAsUser, plex_user, args.name)
-                else:    
+                else:
+                    print(f'Creating playlist \"{args.name}\" ...')
                     create_playlist(runningAsUser, plex_user) 
-                    print(f'\nPlaylist Creation for user [{plex_user}] - COMPLETED\n')
+                    print(f'\nPlaylist creation for user [{plex_user}] - COMPLETED\n')
                 print(f'------------[END]------------- {plex_user} --------------[END]-------------')
                     
             except Unauthorized:
@@ -1326,14 +1237,15 @@ def generate_all_users_playlist_via_server_method(base_url, authToken, homeUsers
                                    
                     runningAsUser = plex_server.myPlexAccount().switchHomeUser(user=homeUser, pin=None).resource(args.resource).connect()
                     
-                    print(f'Current User: {str(runningAsUser)}\n\n')
+                    print(f'\nCurrent User: {homeUser}\n')
 
                     #If the --purge argument was passed in then delete the playlist if it exist
                     if(args.purge == True):
                         delete_playlist(runningAsUser, homeUser, args.name) 
-                    else: 
+                    else:
+                        print(f'Creating playlist \"{args.name}\" ...')
                         create_playlist(runningAsUser, homeUser)
-                        print(f'\nPlaylist Creation for user [{homeUser}] - COMPLETED\n')                        
+                        print(f'\nPlaylist creation for user [{homeUser}] - COMPLETED\n')                        
                     print(f'------------[END]------------- {homeUser} --------------[END]-------------')  
 
                 except Unauthorized:
@@ -1395,13 +1307,15 @@ def generate_all_users_playlist_via_account_method(plexConnection, accountInfo, 
 
             print(f'\n-----------[BEGIN]-------------- {adminUser} -------------[BEGIN]--------------')
             
-            print(f'Current User [Admin]: {adminUser}\n')
+            print(f'\nCurrent User [Admin]: {adminUser}\n')
 
             #If the --purge argument was passed in then delete the playlist if it exist
             if(args.purge == True):
                 delete_playlist(plexConnection, adminUser, args.name)
             else:
-                create_playlist(plexConnection, adminUser) 
+                print(f'Creating playlist \"{args.name}\" ...')
+                create_playlist(plexConnection, adminUser)
+                print(f'\nPlaylist creation for user [{adminUser}] - COMPLETED\n')
             print(f'------------[END]------------- {adminUser} --------------[END]-------------\n')  
 
         except Unauthorized:
@@ -1427,9 +1341,10 @@ def generate_all_users_playlist_via_account_method(plexConnection, accountInfo, 
                 #If the --purge argument was passed in then delete the playlist if it exist
                 if(args.purge == True):
                     delete_playlist(runningAsUser, plex_user, args.name)
-                else:    
+                else:
+                    print(f'Creating playlist \"{args.name}\" ...')
                     create_playlist(runningAsUser, plex_user) 
-                    print(f'\nPlaylist Creation for user [{plex_user}] - COMPLETED\n')
+                    print(f'\nPlaylist creation for user [{plex_user}] - COMPLETED\n')
                 print(f'------------[END]------------- {plex_user} --------------[END]-------------')
                     
             except Unauthorized:
@@ -1451,14 +1366,15 @@ def generate_all_users_playlist_via_account_method(plexConnection, accountInfo, 
                                    
                     runningAsUser = plexConnection.myPlexAccount().switchHomeUser(user=homeUser, pin=None).resource(args.resource).connect()
                     
-                    print(f'Current User: {str(runningAsUser)}\n\n')
+                    print(f'\nCurrent User: {homeUser}\n')
 
                     #If the --purge argument was passed in then delete the playlist if it exist
                     if(args.purge == True):
                         delete_playlist(runningAsUser, homeUser, args.name) 
-                    else: 
+                    else:
+                        print(f'Creating playlist \"{args.name}\" ...')
                         create_playlist(runningAsUser, homeUser)
-                        print(f'\nPlaylist Creation for user [{homeUser}] - COMPLETED\n')                        
+                        print(f'\nPlaylist creation for user [{homeUser}] - COMPLETED\n')                        
                     print(f'------------[END]------------- {homeUser} --------------[END]-------------')  
 
                 except Unauthorized:
