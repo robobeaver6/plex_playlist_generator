@@ -40,12 +40,22 @@ BLACKLIST = ['Downton Abbey',
              ]
 
 
-#####################################################################################################
-###                        Before running this script                                             ###    
-#####################################################################################################
-# [Requirements]                                                                                    #
-#  1. The Library section names (same library type) for you're plex libraries must be unique.       #
-#####################################################################################################
+####################################################################################################################
+###                                         Before running this script                                           ###
+####################################################################################################################
+#  [Requirements]                                                                                                  #
+#       The Library section names (same library type) for you're plex libraries must be unique.                    #
+#                                                                                                                  #
+#                                                                                                                  #
+#  [ChangeLog]                                                                                                     #
+#       07/19/2024 - [Improvements] Greatly reduced runtime of the script by reducing number of calls to plex      #
+#                    by generating the playlist and filling it at the same time.                                   #
+#                  - [Added Feature] Additional episodes of the same series will increment within the playlist.    #
+#                  - [Added Feature] Added blacklisting for Movie Selections.                                      #
+#                  - [Bug Fixes] Fixed a bug where passing a value into the --number argument that was larger than #
+#                    total possible number of media in the provided libraries would cause an infinite loop.        #
+#                  - [Removed] Removed default values for excludusion list (--exclude-library).                    #
+####################################################################################################################
 
 
 
@@ -74,7 +84,7 @@ def get_args():
     group_libraries.add_argument('--allmovies', help='Grab All Movies in all Library sections From Plex', action='store_true', default=False)
     group_libraries.add_argument('--select-library', '-l', help='Choose between library sections of both TV Shows or Movies to build a playlist from (comma seperated within quotes if multiple users)')
     #The Exclude data will be used in conjuction with either --allshows or --allmovies
-    group_libraries.add_argument('--exclude-library', '-e', help='Comma seperated list (if selecting multiple users) of sections to exclude (I.E. "Test Videos,Workout,Home Videos" ) there should be no space between the comma and the first character of the next value', type=str, default="Videos,Workout,Anime Music Videos,Anime Music,Children's TV Shows")   
+    group_libraries.add_argument('--exclude-library', '-e', help='Comma seperated list (if selecting multiple users) of sections to exclude (I.E. "Test Videos,Workout,Home Videos" ) there should be no space between the comma and the first character of the next value', type=str, default="")
     group_libraries.add_argument('--purge', help='Remove a playlist from plex for the provided user(s)', action='store_true', default=False)  
     group_users = parser.add_argument_group('User Profile Selection')    
     #Used for Entering the Admin user(s) 
@@ -86,10 +96,236 @@ def get_args():
     return parser.parse_args()
 
 
+def get_random_episodes_or_movies(plex, all_provided_sections, requested_playlist_items=10):
 
-def get_random_episodes(all_shows, n=10):
+    #The name of the library sections type IE (MovieSection, ShowSection, MusicSection, PhotoSection) its used to query the type of data too grab from the plex API
+    getMovieSection = 'MovieSection'
+    getShowSection = 'ShowSection'
+    
+    #use to query and find show sections from the for command if statement
+    getShowSectionSearcher = '<' + getShowSection + colon
+    getMovieSectionSearcher = '<' + getMovieSection + colon
+
+    all_shows_or_movies_from_provided_sections = list()
+    all_shows_from_provided_sections = list()
+    all_movies_from_provided_sections = list()
+    
+    #Used to determine whether to append to a empty library section all content, or add to concatinate an existing set of data
+    count = 0
+    
+    for provided_section in all_provided_sections:
+        if count == 0:
+            all_shows_or_movies_from_provided_sections = plex.library.section(provided_section).all()
+            
+            if getShowSectionSearcher in str(plex.library.section(provided_section)):
+                all_shows_from_provided_sections = plex.library.section(provided_section).all()
+                
+            elif getMovieSectionSearcher in str(plex.library.section(provided_section)):
+                if(args.include_watched == True):
+                    logger.debug(f'\nIncluding Watched Movies...\n')
+                    all_movies_from_provided_sections = plex.library.section(provided_section)
+                    
+                else:
+                    logger.debug(f'\nExcluding Watched Movies...\n')
+                    all_movies_from_provided_sections = plex.library.section(provided_section).all(unwatched=True)
+                
+            count += 1
+        else:
+            all_shows_or_movies_from_provided_sections = all_shows_or_movies_from_provided_sections + plex.library.section(provided_section).all()
+            logger.debug(f'\nall_shows_or_movies_from_provided_sections[{count}] = {all_shows_or_movies_from_provided_sections}')
+   
+            if getShowSectionSearcher in str(plex.library.section(provided_section)):
+                all_shows_from_provided_sections = all_shows_from_provided_sections + plex.library.section(provided_section).all()
+                logger.debug(f'\nall_shows_from_provided_sections = {all_shows_from_provided_sections}')
+                
+            elif getMovieSectionSearcher in str(plex.library.section(provided_section)):
+                if(args.include_watched == True):
+                    logger.debug(f'\nIncluding Watched Movies...\n')
+                    all_movies_from_provided_sections = all_movies_from_provided_sections + plex.library.section(provided_section)
+                    
+                else:
+                    #If the user did not select to include watched movies with --include-watched
+                    logger.debug(f'\nExcluding Watched Movies...\n')
+                    all_movies_from_provided_sections = all_movies_from_provided_sections + plex.library.section(provided_section).all(unwatched=True)
+
+                logger.debug(f'\nall_movies_from_provided_sections = {all_movies_from_provided_sections}')
+                
+            count += 1
+
+
+    if len(all_shows_from_provided_sections) > 0:
+        show_episodes = dict()
+        for show in all_shows_from_provided_sections:
+            if args.include_watched is True:
+                if args.randomize is False:
+                    logger.warning("Setting --randomized flag, or playlist will always start at Episode 1 for each series")
+                    args.randomize = True
+                if args.ignore_skipped is False:
+                    logger.warning("Setting --ignore-skipped flag, missing episode check is not compatible with --randomized option flag")
+                    args.ignore_skipped = True
+
+            if show.isWatched and args.include_watched is not True:
+                continue
+            if show.title in BLACKLIST:
+                logger.debug(f'GET_EPISODES: Show Blacklisted: {show.title}')
+                continue
+            if args.include_watched is True:
+                #show_episodes[show.title] = show.episodes()
+                #Grab Watched Episodes but ignore Season 0 (Specials)
+                show_episodes[show.title] = show.episodes(parentIndex__gt=0)
+            else:
+                show_episodes[show.title] = show.unwatched()
+
+
+    #Used to randomly choose between show or movies if both are supplied
+    get_show = "show"
+    get_movie = "movie"
+    mediaTypeSelector = None
+    get_show_or_movie = [ get_show, get_movie ]
+    
+    #Used to determine if the show or movies was empty. If not then they are valid selections for get_show_or_movie variable
+    shows_available = False
+    movies_available = False
+    
+    #If the playlist item count passed in by the user is larger than the total item count of the selected content then update the value of the playlist to be that of the maximum number of contents passed in to the script
+    if(len(all_shows_or_movies_from_provided_sections)) < requested_playlist_items:
+        requested_playlist_items = len(all_shows_or_movies_from_provided_sections)
+
+    playlist = []
+    while len(playlist) < requested_playlist_items:
+        #Using The list of Shows
+        if len(all_shows_from_provided_sections) > 0:
+            show_or_movie_name = random.choice(list(show_episodes.keys()))
+            shows_available = True
+            
+        #Using The list of Movies.
+        if (all_movies_from_provided_sections):
+            show_or_movie_name = random.choice(all_movies_from_provided_sections)
+            movies_available = True
+        
+        if(shows_available == True) and (movies_available == True):
+            mediaTypeSelector = random.choice(get_show_or_movie)
+            
+        elif(shows_available == False) and (movies_available == True):
+            mediaTypeSelector = get_movie
+            
+        elif(shows_available == True) and (movies_available == False):
+            mediaTypeSelector = get_show
+        
+        else:
+            print(f'No available movies or TV Shows available to choose from.')
+            exit(1)
+
+        #For TV Shows Only
+        if (mediaTypeSelector == get_show):
+            show_name = random.choice(list(show_episodes.keys()))
+            
+            if len(show_episodes[show_name]) >0:
+                if args.ignore_skipped is False:
+                    if skipped_missing(all_shows.get(title=show_name), show_episodes[show_name][0]):
+                        continue
+                if args.randomize:
+                    random.shuffle(show_episodes[show_name])
+                    
+                playlist.append(show_episodes[show_name].pop(0))
+
+            else:
+                logger.debug(f'GET_EPISODES: No more unwatched episodes for {show_name}')
+                continue
+        
+        #For Movies Only      
+        elif (mediaTypeSelector == get_movie):
+            
+            #If a list of Blacklisted Media was supplied
+            if(BLACKLIST != None):
+                
+                total_blacklisted_item_count = len(BLACKLIST)
+                blacklistCounter = 0
+        
+                #Try 3 times to add data without it being blacklisted before giving up
+                try_at_least_three_times = 3
+
+                #Three Consecutive attempts. Used for determining how many times consecutively something has been tried to be blackllisted and skipped in the while loop
+                three_consecutive_attempts = 1
+                increment_consecutive_count_one = False
+                increment_consecutive_count_two = False
+                increment_consecutive_count_three = False
+
+            
+                #if all_movies.title in BLACKLIST:
+                for movie in all_movies_from_provided_sections:
+                    if movie.title in BLACKLIST:
+                    
+                        logger.debug(f'GET_EPISODES: Movie Blacklisted: {movie.title}')
+                        blacklistCounter += 1
+
+                        #If the number of times we reach here is greater than BLACKLISTED items count, we are likely in a continuous loop so break pout
+                        if (three_consecutive_attempts >= try_at_least_three_times) and (blacklistCounter > total_blacklisted_item_count):
+                            print(f'Too many attempts being Blacklisted, exiting the loop... ')
+                            break
+                        
+                        else:
+                            #if (increment_consecutive_count_one == False):
+                            if (increment_consecutive_count_one == False):
+                                increment_consecutive_count_one = True
+                                three_consecutive_attempts += 1
+                                continue
+                                
+                            elif (increment_consecutive_count_two == False):
+                                increment_consecutive_count_two = True
+                                three_consecutive_attempts += 1
+                                continue
+                            elif (increment_consecutive_count_three == False):
+                                increment_consecutive_count_three = True
+                                three_consecutive_attempts += 1
+                                print(f'Too many attempts being Blacklisted, exiting the loop... ')
+                                break
+                        
+                    else:
+                        #Reset All counters since it was not either not a blacklisted media item or the blacklist counter was not consecutive
+                        three_consecutive_attempts = 0
+                        increment_consecutive_count_one = False
+                        increment_consecutive_count_two = False
+                        increment_consecutive_count_three = False
+
+            if(args.include_watched == True):
+                #If the user selects to include watched movies
+                logger.debug(f'\nIncluding Watched Movies...\n')
+                movie = random.choice(all_movies_from_provided_sections)
+
+            else:
+                #If the user did not select to include watched movies with --include-watched
+                logger.debug(f'\nExcluding Unwatched Movies...\n')
+                movie = random.choice(all_movies_from_provided_sections)
+
+            playlist.append(movie)
+    return playlist
+
+
+
+#def get_random_episodes(all_shows, n=10):
+#def get_random_episodes(all_provided_sections, n=10):
+def get_random_episodes(plex, all_provided_sections, n=10):
+
+    #Used to determine whether to append to a empty library section all content, or add to concatinate an existing set of data
+    count = 0
+    
+    print(f'\nall_provided_sections = {all_provided_sections}\n')
+    for provided_section in all_provided_sections:
+        #all_shows_from_provided_sections.append(provided_section)
+        if count == 0:
+            all_shows_from_provided_sections = plex.library.section(provided_section).all()
+            print(f'\nall_shows_from_provided_sections[{count}] = {all_shows_from_provided_sections}')
+            count += 1
+        else:
+            all_shows_from_provided_sections = all_shows_from_provided_sections + plex.library.section(provided_section).all()
+            print(f'\nall_shows_from_provided_sections[{count}] = {all_shows_from_provided_sections}')
+            count += 1
+
+    
     show_episodes = dict()
-    for show in all_shows.all():
+    #for show in all_shows.all():
+    for show in all_shows_from_provided_sections:
         if args.include_watched is True:
             if args.randomize is False:
                 logger.warning("Setting --randomized flag, or playlist will always start at Episode 1 for each series")
@@ -133,6 +369,7 @@ def get_random_episodes(all_shows, n=10):
         else:
             logger.debug(f'GET_EPISODES: No more unwatched episodes for {show_name}')
             continue
+    print(f'next_n = {next_n}')
     return next_n
     
     
@@ -144,6 +381,12 @@ def get_random_movies(all_movies, n=10):
     movieCounter = 0
 
     while len(movies_found_list) < n:
+        
+        #If the 
+        #if show.title in BLACKLIST:
+        if all_movies.title in BLACKLIST:
+            logger.debug(f'GET_EPISODES: Show Blacklisted: {show.title}')
+            continue
         
         if(args.include_watched == True):
             #If the user selects to include watched movies
@@ -236,7 +479,9 @@ def build_playlist(plex, userName, plex_refined_library_sections, selectionsToEx
     #number of Media items added to the library.
     libraryCount = 0 
     
-    print(f'plex_refined_library_sections = {plex_refined_library_sections}')
+    #Use to compare if the Video item is a plex Movie object or a plex Show object
+    getShow = "episode"
+    getMovie = "movie"
     
     #Check to see if any of the selected Library names supplied are valid. If not then Error out.
     if(len(plex_refined_library_sections) <= 0):
@@ -252,171 +497,45 @@ def build_playlist(plex, userName, plex_refined_library_sections, selectionsToEx
 
 
     getPlexLibrarySection = plex.library.section(randomSelectedLibrary)
+
+    randomSelectedLibrary = random.choice(plex_refined_library_sections)
     
-    
-    #Used when Media is A show or Movie
-    isShow = False
-    isMovie = False
+    logger.debug(f'\nSelected Library: \"{randomSelectedLibrary}\"\n')
 
-    while (1):
-        randomSelectedLibrary = random.choice(plex_refined_library_sections)
+    getPlexLibrarySection = plex.library.section(randomSelectedLibrary)
+    logger.debug(f'getPlexLibrarySection = {getPlexLibrarySection}')       
         
-        logger.debug(f'\nSelected Library: \"{randomSelectedLibrary}\"\n')
+    if (args.select_library != None) or ((args.allshows == True) and (args.allmovies == True)):
 
-        getPlexLibrarySection = plex.library.section(randomSelectedLibrary)
-        logger.debug(f'getPlexLibrarySection = {getPlexLibrarySection}')
-
-        if randomSelectedLibrary in plex_refined_library_sections:
+        episode_or_movie = get_random_episodes_or_movies(plex, plex_refined_library_sections, args.number)
         
-            all_Shows_or_Movies_Library_Selection = plex.library.section(randomSelectedLibrary)           
-            
-            if (args.select_library != None) or ((args.allshows == True) and (args.allmovies == True)):
 
-                #The name of the library sections type IE (MovieSection, ShowSection, MusicSection, PhotoSection) its used to query the type of data too grab from the plex API
-                getMovieSection = 'MovieSection'
-                getShowSection = 'ShowSection'
-                
-                #use to query and find show sections from the for command if statement
-                getShowSectionSearcher = '<' + getShowSection + colon
-                getMovieSectionSearcher = '<' + getMovieSection + colon
-                
-                if getShowSectionSearcher in str(all_Shows_or_Movies_Library_Selection):
-                    episode_or_movie = get_random_episodes(all_Shows_or_Movies_Library_Selection, n=1)
-                    
-                    print('\n\n-----------------------------------')
-                    print('[RANDOMIZED EPISODES]')
-                    print(f'Username: {userName}')
-                    print(f'Library Selection: {randomSelectedLibrary}\n')
-                    
-                    #Print the Episode added to the playlist
-                    for episode in episode_or_movie:
-                        season_episode = episode.seasonEpisode      
-                        print(f'Episode Name: \"{episode.grandparentTitle} - {episode.parentTitle} - '
-                          f'Ep.0{episode.index} - {episode.title}\"')
-                    
-                    #If no library sections are to be excluded print None for the excluded Library sections
-                    if (not selectionsToExclude_List) or (args.exclude_library == ''):
-                        print(f'\nExcluded Library Sections: None')
+        try:
+            #If a playlist with the same name already exist, delete it
+            if plex.playlist(title=args.name):
+                print(f'The playlist "{args.name}" already exist.')
+                print(f'deleting playlist "{args.name}" ...')
+                plex.playlist(title=args.name).delete()
 
-                    else:
-                        #Remove Empty strings from the list
-                        selectionsToExclude_List = list(filter(None, selectionsToExclude_List))
-                        print(f'\nExcluded Library Sections: {selectionsToExclude_List}')
-                    print('-----------------------------------\n\n')
-                    
-                    #Set isShow to True
-                    isShow = True
-                    #Set isMovie to False
-                    isMovie = False
-                    
-                elif getMovieSectionSearcher in str(all_Shows_or_Movies_Library_Selection):
-                    episode_or_movie = get_random_movies(all_Shows_or_Movies_Library_Selection, n=1)
-                    
-                    print('\n\n-----------------------------------')
-                    print('[RANDOMIZED MOVIES]')
-                    print(f'Username: {userName}\n')
-                    print(f'Library Selection: {randomSelectedLibrary}\n')
-                    
-                    #Print the Movie that was added to the playlist
-                    for movie in episode_or_movie:
-                        print(f'Movie Name: \"{movie.title}\"')
-                    
-                    #If no library sections are to be excluded print None for the excluded Library sections
-                    if (not selectionsToExclude_List) or (args.exclude_library == ''):
-                        print(f'\nExcluded Library Sections: None')
+        except NotFound as e: 
+            logger.debug(f"Playlist {args.name} does not exist to delete.")
 
-                    else:
-                        #Remove Empty strings from the list
-                        selectionsToExclude_List = list(filter(None, selectionsToExclude_List))
-                        print(f'\nExcluded Library Sections: {selectionsToExclude_List}')
-                    print('-----------------------------------\n\n')
-                    
-                    #Set isMovie to True
-                    isMovie = True
-                    #Set isShow to False
-                    isShow = False
-                    
+        #Create Playlist, and fill it immediately 
+        createdPlaylist = Playlist.create(server=plex, title=args.name, items=episode_or_movie, section=None, smart=False, limit=None, libtype=None, sort=None, filters=None, m3ufilepath=None)
+        
+        #If the created playlist was not actually created, Error and exist the script.
+        if(not createdPlaylist):
+            print(f'Error - Unable to generate the Playlist \"{args.name}\"')
+            exit(1)
 
-                else:
-                    print(f'ERROR - Unknown Library Section \"{all_Shows_or_Movies_Library_Selection}\"')
-                    exit(1)
-
-
-                if libraryCount == 0:
-                    try:
-                        #If a playlist with the same name already exist, delete it
-                        if plex.playlist(title=args.name):
-                            print(f'The playlist "{args.name}" already exist.')
-                            print(f'deleting playlist "{args.name}" ...')
-                            plex.playlist(title=args.name).delete()
-
-                    except NotFound as e: 
-                        logger.debug(f"Playlist {args.name} does not exist to delete.")
-
-                    print(f'\nCreating Playlist ... \n')
-                    
-                    #Create Playlist 
-                    createdPlaylist = Playlist.create(server=plex, title=args.name, items=episode_or_movie, section=None, smart=False, limit=None, libtype=None, sort=None, filters=None, m3ufilepath=None)
-                                 
-                    print(f'Created Playlist: {args.name}')
-                    
-                    #Print the Episode or Movie that was added to the playlist
-                    if (isShow == True):
-                        for episode in episode_or_movie:
-                            season_episode = episode.seasonEpisode      
-                            print(f'Added to Playlist [{args.name}]: \"{episode.grandparentTitle} - {episode.parentTitle} - '
-                              f'Ep.0{episode.index} - {episode.title}\"')
-                    elif (isMovie == True):
-                        for movie in episode_or_movie:
-                            print(f'Added to Playlist [{args.name}]: \"{movie.title}\"')
-                    
-                    libraryCount += 1
-                    
-                    print(f'Number of Items in Playlist: {libraryCount}\n')
-
-                    #if the number of loops is equal to or greater than the number passed in as an argument with args.number break out of the loop
-                    if libraryCount >= args.number:
-                       break
-
-                else:
-                    print(f'\nAdding to Playlist ...\n')
-                    
-                    #Add to Playlist
-                    createdPlaylist.addItems(items=episode_or_movie)
-
-                    #Print the Episode or Movie that was added to the playlist
-                    if (isShow == True):
-                        for episode in episode_or_movie:
-                            season_episode = episode.seasonEpisode      
-                            print(f'Added to Playlist [{args.name}]: \"{episode.grandparentTitle} - {episode.parentTitle} - '
-                              f'Ep.0{episode.index} - {episode.title}\"')
-                    elif (isMovie == True):
-                        for movie in episode_or_movie:
-                            print(f'Added to Playlist [{args.name}]: \"{movie.title}\"')
-                    
-                    libraryCount += 1
-                    
-                    print(f'Number of Items in Playlist: {libraryCount}\n')
-
-                    #if the number of loops is equal to or greater than the number passed in as an argument with args.number break out of the loop
-                    if libraryCount >= args.number:
-                       break
-            
-
-            #For TV Shows Only
-            elif (args.allshows == True) and (args.allmovies == False):
-                episodes = get_random_episodes(all_Shows_or_Movies_Library_Selection, n=1)
-
-                print('\n\n-----------------------------------')
+        #Print the Episode added to the playlist
+        for episode_movie in episode_or_movie:
+            #If the media type is show then print the output for the show details
+            if episode_movie.TYPE in getShow:
+                print('\n-----------------------------------')
                 print('[RANDOMIZED EPISODES]')
                 print(f'Username: {userName}')
-                print(f'Library Selection: {randomSelectedLibrary}\n')
-
-                #Print the Episode that was added to the playlist
-                for episode in episodes:
-                    season_episode = episode.seasonEpisode      
-                    print(f'Episode Name: \"{episode.grandparentTitle} - {episode.parentTitle} - '
-                          f'Ep.0{episode.index} - {episode.title}\"')
+                print(f'Library Selection: {episode_movie.librarySectionTitle}\n')  
 
                 #If no library sections are to be excluded print None for the excluded Library sections
                 if (not selectionsToExclude_List) or (args.exclude_library == ''):
@@ -426,73 +545,22 @@ def build_playlist(plex, userName, plex_refined_library_sections, selectionsToEx
                     #Remove Empty strings from the list
                     selectionsToExclude_List = list(filter(None, selectionsToExclude_List))
                     print(f'\nExcluded Library Sections: {selectionsToExclude_List}')
-                print('-----------------------------------\n\n')
-
-                if libraryCount == 0:
-                    try:
-                        #If a playlist with the same name already exist, delete it
-                        if plex.playlist(title=args.name):
-                            print(f'The playlist "{args.name}" already exist.')
-                            print(f'deleting playlist "{args.name}" ...')
-                            plex.playlist(title=args.name).delete()
-
-                    except NotFound as e: 
-                        logger.debug(f"Playlist {args.name} does not exist to delete.")
-
-                    print(f'\nCreating Playlist ... \n')
-       
-                    #Create Playlist 
-                    createdPlaylist = Playlist.create(server=plex, title=args.name, items=episodes, section=None, smart=False, limit=None, libtype=None, sort=None, filters=None, m3ufilepath=None)
-                   
-                    print(f'Created Playlist: {args.name}')
-                    
-                    #Print the Episode that was added to the playlist
-                    for episode in episodes:
-                        season_episode = episode.seasonEpisode      
-                        print(f'Added to Playlist [{args.name}]: \"{episode.grandparentTitle} - {episode.parentTitle} - '
-                              f'Ep.0{episode.index} - {episode.title}\"')
-                    
-                    
-                    libraryCount += 1
-                    
-                    print(f'Number of Items in Playlist: {libraryCount}\n')
-                    
-                    #if the number of loops is equal to or greater than the number passed in as an argument with args.number break out of the loop
-                    if libraryCount >= args.number:
-                       break
-                else:
-                    print(f'\nAdding to Playlist ...\n')
-                    
-                    #Add to Playlist
-                    createdPlaylist.addItems(items=episodes)
-
-                    #Print the Episode that was added to the playlist
-                    for episode in episodes:
-                        season_episode = episode.seasonEpisode      
-                        print(f'\nAdded to Playlist [{args.name}]: \"{episode.grandparentTitle} - {episode.parentTitle} - '
-                              f'Ep.0{episode.index} - {episode.title}\"')
-                    
-                    libraryCount += 1
-                    
-                    print(f'Number of Items in Playlist: {libraryCount}\n')
+        
+                logger.debug(f'\n\nepisode [label] = {(episode_movie.TYPE)}\n\n')
+                season_episode = episode_movie.seasonEpisode      
+                print(f'\nAdded to Playlist [{args.name}]: \"{episode_movie.grandparentTitle} - {episode_movie.parentTitle} - '
+                      f'Ep.0{episode_movie.index} - {episode_movie.title}\"')
+                  
+                libraryCount += 1
+                print(f'Number of Items in Playlist: {libraryCount}\n')
                 
-                    #if the number of loops is equal to or greater than the number passed in as an argument with args.number break out of the loop
-                    if libraryCount >= args.number:
-                       break
-                   
-            #For Movies Only      
-            elif (args.allshows == False) and args.allmovies == True:
-                movies = get_random_movies(all_Shows_or_Movies_Library_Selection, n=1)
-
-                print('\n\n-----------------------------------')
+            #If the media type is movie then print the output for the movie details
+            elif episode_movie.TYPE in getMovie:
+                print('\n-----------------------------------')
                 print('[RANDOMIZED MOVIES]')
-                print(f'Username: {userName}\n')
-                print(f'Library Selection: {randomSelectedLibrary}\n')
+                print(f'Username: {userName}')
+                print(f'Library Selection: {episode_movie.librarySectionTitle}')
                 
-                #Print the Movie that was added to the playlist
-                for movie in movies:
-                    print(f'Movie Name: \"{movie.title}\"')
-                    
                 #If no library sections are to be excluded print None for the excluded Library sections
                 if (not selectionsToExclude_List) or (args.exclude_library == ''):
                     print(f'\nExcluded Library Sections: None')
@@ -501,63 +569,116 @@ def build_playlist(plex, userName, plex_refined_library_sections, selectionsToEx
                     #Remove Empty strings from the list
                     selectionsToExclude_List = list(filter(None, selectionsToExclude_List))
                     print(f'\nExcluded Library Sections: {selectionsToExclude_List}')
-                print('-----------------------------------\n\n')
 
-                if libraryCount == 0:
-                    try:
-                        #If a playlist with the same name already exist, delete it
-                        if plex.playlist(title=args.name):
-                            print(f'The playlist "{args.name}" already exist.')
-                            print(f'deleting playlist "{args.name}" ...')
-                            plex.playlist(title=args.name).delete()
-
-                    except NotFound as e: 
-                        logger.debug(f"Playlist {args.name} does not exist to delete.")
-
-                    print(f'\nCreating Playlist ... \n')
-                    
-                    #Create Playlist 
-                    createdPlaylist = Playlist.create(server=plex, title=args.name, items=movies, section=None, smart=False, limit=None, libtype=None, sort=None, filters=None, m3ufilepath=None)
-                   
-                    print(f'Created Playlist: {args.name}')
-
-                    #Print the Movie that was added to the playlist
-                    for movie in movies:
-                        print(f'Added to Playlist [{args.name}]: \"{movie.title}\"')
-                    
-                    libraryCount += 1
-                    
-                    print(f'Number of Items in Playlist: {libraryCount}\n')
-
-                    #if the number of loops is equal to or greater than the number passed in as an argument with args.number break out of the loop
-                    if libraryCount >= args.number:
-                       break
+                print(f'\nAdded to Playlist [{args.name}]: \"{episode_movie.title}\"')
                 
+                libraryCount += 1
+                print(f'Number of Items in Playlist: {libraryCount}\n')
+
+
+    #For TV Shows Only
+    elif (args.allshows == True) and (args.allmovies == False):
+        episode_or_movie = get_random_episodes_or_movies(plex, plex_refined_library_sections, args.number)
+              
+        try:
+            #If a playlist with the same name already exist, delete it
+            if plex.playlist(title=args.name):
+                print(f'The playlist "{args.name}" already exist.')
+                print(f'deleting playlist "{args.name}" ...')
+                plex.playlist(title=args.name).delete()
+
+        except NotFound as e: 
+            logger.debug(f"Playlist {args.name} does not exist to delete.")
+            
+            
+        #Create Playlist, and fill it immediately 
+        createdPlaylist = Playlist.create(server=plex, title=args.name, items=episode_or_movie, section=None, smart=False, limit=None, libtype=None, sort=None, filters=None, m3ufilepath=None)
+        
+        #If the created playlist was not actually created, Error and exist the script.
+        if(not createdPlaylist):
+            print(f'Error - Unable to generate the Playlist \"{args.name}\"')
+            exit(1)
+        
+
+        #Print the Episode added to the playlist
+        for episode_movie in episode_or_movie:
+            #If the media type is show then print the output for the show details
+            if episode_movie.TYPE in getShow:
+                print('\n-----------------------------------')
+                print('[RANDOMIZED EPISODES]')
+                print(f'Username: {userName}')
+                print(f'Library Selection: {episode_movie.librarySectionTitle}\n')  
+
+                #If no library sections are to be excluded print None for the excluded Library sections
+                if (not selectionsToExclude_List) or (args.exclude_library == ''):
+                    print(f'\nExcluded Library Sections: None')
+
                 else:
-                    print(f'\nAdding to Playlist ...\n')
-                    
-                    #Add to Playlist
-                    createdPlaylist.addItems(items=movies)
+                    #Remove Empty strings from the list
+                    selectionsToExclude_List = list(filter(None, selectionsToExclude_List))
+                    print(f'\nExcluded Library Sections: {selectionsToExclude_List}')
+        
+                logger.debug(f'\n\nepisode [label] = {(episode_movie.TYPE)}\n\n')
+                #print(f'\nplexMovieType = {plexMovieType}\n')
+                season_episode = episode_movie.seasonEpisode      
+                print(f'\nAdded to Playlist [{args.name}]: \"{episode_movie.grandparentTitle} - {episode_movie.parentTitle} - '
+                      f'Ep.0{episode_movie.index} - {episode_movie.title}\"')
+                  
+                libraryCount += 1
+                print(f'Number of Items in Playlist: {libraryCount}\n')
 
-                    #Print the Movie that was added to the playlist
-                    for movie in movies:
-                        print(f'Movie Name: \"{movie.title}\"')
+           
+    #For Movies Only      
+    elif (args.allshows == False) and (args.allmovies == True):
+        #movies = get_random_movies(all_Shows_or_Movies_Library_Selection, n=1)
+        episode_or_movie = get_random_episodes_or_movies(plex, plex_refined_library_sections, args.number)
+        
+        
+        try:
+            #If a playlist with the same name already exist, delete it
+            if plex.playlist(title=args.name):
+                print(f'The playlist "{args.name}" already exist.')
+                print(f'deleting playlist "{args.name}" ...')
+                plex.playlist(title=args.name).delete()
 
-                    libraryCount += 1
-                    
-                    print(f'Number of Items in Playlist: {libraryCount}\n')
+        except NotFound as e: 
+            logger.debug(f"Playlist {args.name} does not exist to delete.")
+            
+            
+        #Create Playlist, and fill it immediately 
+        createdPlaylist = Playlist.create(server=plex, title=args.name, items=episode_or_movie, section=None, smart=False, limit=None, libtype=None, sort=None, filters=None, m3ufilepath=None)
+        
+        #If the created playlist was not actually created, Error and exist the script.
+        if(not createdPlaylist):
+            print(f'Error - Unable to generate the Playlist \"{args.name}\"')
+            exit(1)
+        
+        #Print the Episode added to the playlist
+        for episode_movie in episode_or_movie:
+            #If the media type is show then print the output for the show details
+            if episode_movie.TYPE in getShow:
+                print('\n-----------------------------------')
+                print('[RANDOMIZED EPISODES]')
+                print(f'Username: {userName}')
+                print(f'Library Selection: {episode_movie.librarySectionTitle}\n')  
 
-                    #if the number of loops is equal to or greater than the number passed in as an argument with args.number break out of the loop
-                    if libraryCount >= args.number:
-                       break
-                
-                #if the number of loops is equal to or greater than the number passed in as an argument with args.number break out of the loop
-                if libraryCount >= args.number:
-                   break
+                #If no library sections are to be excluded print None for the excluded Library sections
+                if (not selectionsToExclude_List) or (args.exclude_library == ''):
+                    print(f'\nExcluded Library Sections: None')
 
-        else:
-            print(f'\nERROR - The library \"{randomSelectedLibrary}\" does not exist.\n')
-            break
+                else:
+                    #Remove Empty strings from the list
+                    selectionsToExclude_List = list(filter(None, selectionsToExclude_List))
+                    print(f'\nExcluded Library Sections: {selectionsToExclude_List}')
+        
+                logger.debug(f'\n\nepisode [label] = {(episode_movie.TYPE)}\n\n')
+                season_episode = episode_movie.seasonEpisode      
+                print(f'\nAdded to Playlist [{args.name}]: \"{episode_movie.grandparentTitle} - {episode_movie.parentTitle} - '
+                      f'Ep.0{episode_movie.index} - {episode_movie.title}\"')
+                  
+                libraryCount += 1
+                print(f'Number of Items in Playlist: {libraryCount}\n')
+
 
 
 def create_playlist(plex, account):
@@ -599,7 +720,6 @@ def create_playlist(plex, account):
 
     #Obtain All Library Selections (and format it to only have the names of the libraries as they appear in Plex)
     plex_all_library_sections = allSections_List
-    print(f'plex_all_library_sections = {plex_all_library_sections}')
 
     
     #If the user Selected The library selection (--select-library), default plex_all_tv_and_movie_library_sections_minus_exluded to a Default of an empty list in order to build the list from the users entry
@@ -734,7 +854,6 @@ def create_playlist(plex, account):
                 selectionsToExcludeBasedOnWhatUserSelected_List.append(library)
 
         else:
-
             foundMatchInAllShowsSection = list(filter(library_regex.match, allShowSectionsFull_List))
             foundMatchInAllMoviesSection = list(filter(library_regex.match, allMovieSectionsFull_List))
             foundMatchInAllMusicSection = list(filter(library_regex.match, allMusicSectionsFull_List))
@@ -1233,11 +1352,11 @@ def generate_all_users_playlist_via_account_method(plexConnection, accountInfo, 
     #list of All plex users
     allHomeUsers = get_isolate_and_format_plex_element(plexConnection.myPlexAccount().users())
     
-    print(f'list home users: {homeUsers}')
+    logger.debug(f'list home users: {homeUsers}')
 
-    print(f'\nplex_account = {accountInfo}\n')
+    logger.debug(f'\nplex_account = {accountInfo}\n')
     plex_library_sections = plexConnection.library.sections()
-    print(f'\nplex_library_sections = {plex_library_sections}\n')
+    logger.debug(f'\nplex_library_sections = {plex_library_sections}\n')
 
     #If Home Users was selected, check to see if it contains 'all'
     if(args.homeusers != None):
