@@ -65,6 +65,7 @@ User Profile Selection:
 > Recommend Using a virtual env
 >
 > `pip install Pipfile`
+> `pip install xmltodict`
 
 ## Connection Methods
 ### Account
