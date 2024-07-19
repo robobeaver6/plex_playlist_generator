@@ -108,7 +108,7 @@ Ignore The facty that not all episodes are available for a show in your library 
     `plex_playlist_generator.py --account --username MyUserName --password Sh1tPass --resource MyServer --allmovies --admin --homeusers "all" --ignore-skipped`
 
 Generate a mix 8 random shows and movies:
-    `plex_playlist_generator.py --server --baseurl "http://172.16.1.100:32400" --token "fR5GrDxfLunKynNub5" --allmovies --homeusers --allshows --allmovies` --number 8`
+    `plex_playlist_generator.py --server --baseurl "http://172.16.1.100:32400" --token "fR5GrDxfLunKynNub5" --allmovies --homeusers --allshows --allmovies --number 8`
 
 Generate a playlist with the name "Test1" for all home users:
 `plex_playlist_generator.py --account --username MyUserName --password Sh1tPass --resource MyServer --allmovies --admin --homeusers "all" --name "Test1"`
