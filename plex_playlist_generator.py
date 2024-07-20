@@ -55,7 +55,8 @@ BLACKLIST = ['Downton Abbey',
 #                  - [Bug Fixes] Fixed a bug where passing a value into the --number argument that was larger than #
 #                    total possible number of media in the provided libraries would cause an infinite loop.        #
 #                  - [Removed] Removed default values for excludusion list (--exclude-library).                    #
-#                  - [Reverted] Reverted a change that removed the code for excluding special episodes/seasons.    #
+#                  - [Bug Fixes] Fixed a bug causing index out of bounds errors                                    #
+#                    in the code for excluding special episodes/seasons.                                           #
 #                  - [Removed] Removed no longer needed code.                                                      #
 ####################################################################################################################
 
@@ -179,13 +180,16 @@ def get_random_episodes_or_movies(plex, all_provided_sections, requested_playlis
                 show_episodes[show.title] = show.unwatched()
             
             # remove series 0 specials
-            while show_episodes[show.title][0].seasonNumber == 0:
-                season_episode = show_episodes[show.title][0].seasonEpisode
-                episode_title = show_episodes[show.title][0].seasonEpisode
-                show_episodes[show.title].pop(0)
-                logger.debug(f'get_random_episodes: Series 0 Episode Removed '
-                             f'{show.title} - {episode_title} - {season_episode}')
-    
+            for season_numbers in show_episodes[show.title]:
+                if season_numbers.seasonNumber == 0:
+                    season_episode = show_episodes[show.title][0].seasonEpisode
+                    episode_title = show_episodes[show.title][0].title
+
+                    logger.debug(f'get_random_episodes: Series 0 Episode Removed '
+                                 f'{show.title} - {season_episode} - {episode_title} ')
+                
+                    show_episodes[show.title].pop(0)
+
 
     #Used to randomly choose between show or movies if both are supplied
     get_show = "show"
@@ -454,7 +458,6 @@ def build_playlist(plex, userName, plex_refined_library_sections, selectionsToEx
                     selectionsToExclude_List = list(filter(None, selectionsToExclude_List))
                     print(f'\nExcluded Library Sections: {selectionsToExclude_List}')
         
-                logger.debug(f'\n\nepisode [label] = {(episode_movie.TYPE)}\n\n')
                 season_episode = episode_movie.seasonEpisode      
                 print(f'\nAdded to Playlist [{args.name}]: \"{episode_movie.grandparentTitle} - {episode_movie.parentTitle} - '
                       f'Ep.0{episode_movie.index} - {episode_movie.title}\"')
