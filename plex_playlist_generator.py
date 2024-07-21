@@ -58,6 +58,9 @@ BLACKLIST = ['Downton Abbey',
 #                  - [Bug Fixes] Fixed a bug causing index out of bounds errors                                    #
 #                    in the code for excluding special episodes/seasons.                                           #
 #                  - [Removed] Removed no longer needed code.                                                      #
+#                                                                                                                  #
+#       07/20/2024 - [Bug Fixes] Fixed a bug that caused the special episodes removal code to not work properly    #
+#                    when all episodes after special episodes have been watched.                                   #
 ####################################################################################################################
 
 
@@ -78,10 +81,10 @@ def get_args():
     group_account.add_argument('--password', '-p', help='Plex Account Password')
     group_account.add_argument('--resource', '-r', help='Resource Name (Plex Server Name)')
     group_account.add_argument('--tvdb-api-key', help='TVDB API Key)')
-    group_behaviour = parser.add_argument_group('Episode/Movie Selection Behaviour')
-    group_behaviour.add_argument('--ignore-skipped', action='store_true', help="Don't test for missing episodes", default=True)
-    group_behaviour.add_argument('--randomize', action='store_true', help='Randomize selected episodes, not next unwatched')
-    group_behaviour.add_argument('--include-watched', action='store_true', help='include watched movies or episodes (use with --randomize)')  
+    group_behavior = parser.add_argument_group('Episode/Movie Selection Behavior')
+    group_behavior.add_argument('--ignore-skipped', action='store_true', help="Don't test for missing episodes", default=True)
+    group_behavior.add_argument('--randomize', action='store_true', help='Randomize selected episodes, not next unwatched')
+    group_behavior.add_argument('--include-watched', action='store_true', help='include watched movies or episodes (use with --randomize)')  
     group_libraries = parser.add_argument_group('Library Selection Behavior')    
     group_libraries.add_argument('--allshows', help='Grab All Shows in all Library sections From Plex', action='store_true', default=False)
     group_libraries.add_argument('--allmovies', help='Grab All Movies in all Library sections From Plex', action='store_true', default=False)
@@ -178,17 +181,36 @@ def get_random_episodes_or_movies(plex, all_provided_sections, requested_playlis
                 show_episodes[show.title] = show.episodes(parentIndex__gt=0)
             else:
                 show_episodes[show.title] = show.unwatched()
+              
+
+            #Get the Season number of the Show
+            getSeasonNumber = show_episodes[show.title][0].seasonNumber
             
             # remove series 0 specials
-            for season_numbers in show_episodes[show.title]:
-                if season_numbers.seasonNumber == 0:
+            while getSeasonNumber == 0:
+                #If the Season Number is 0 remove it from the list of shows and episodes
+                if getSeasonNumber == 0:
                     season_episode = show_episodes[show.title][0].seasonEpisode
                     episode_title = show_episodes[show.title][0].title
 
                     logger.debug(f'get_random_episodes: Series 0 Episode Removed '
-                                 f'{show.title} - {season_episode} - {episode_title} ')
+                                 f'{show.title} - {season_episode} - {episode_title} \n')
                 
                     show_episodes[show.title].pop(0)
+    
+                logger.debug(f'getSeasonNumber [before] = {getSeasonNumber}')
+
+                try:
+                    #The position of the new data after applying the pop has not been tested to see if it is a special season yet.
+                    # So rewind the Season count to the beginning in order to test it in the next go around.
+                    # When the new data's season number is equal to 0, it will run the loop again, otherwise it will exit the loop for this iteration.
+                    getSeasonNumber = show_episodes[show.title][0].seasonNumber
+                    logger.debug(f'getSeasonNumber [after] = {getSeasonNumber}')
+                    
+                except IndexError as e:
+                    #If the Index is out of range (this can occur if the seasons after the special seasons have all been watched).
+                    print(f'\nIndex that Procceeds \"{show.title} - {season_episode} - {episode_title}\" is out of Range :: {e}\n')
+                    break
 
 
     #Used to randomly choose between show or movies if both are supplied
