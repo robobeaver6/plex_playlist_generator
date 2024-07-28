@@ -40,28 +40,30 @@ BLACKLIST = ['Downton Abbey',
              ]
 
 
-####################################################################################################################
-###                                         Before running this script                                           ###
-####################################################################################################################
-#  [Requirements]                                                                                                  #
-#       The Library section names (same library type) for you're plex libraries must be unique.                    #
-#                                                                                                                  #
-#                                                                                                                  #
-#  [ChangeLog]                                                                                                     #
-#       07/19/2024 - [Improvements] Greatly reduced runtime of the script by reducing number of calls to plex      #
-#                    by generating the playlist and filling it at the same time.                                   #
-#                  - [Added Feature] Additional episodes of the same series will increment within the playlist.    #
-#                  - [Added Feature] Added blacklisting for Movie Selections.                                      #
-#                  - [Bug Fixes] Fixed a bug where passing a value into the --number argument that was larger than #
-#                    total possible number of media in the provided libraries would cause an infinite loop.        #
-#                  - [Removed] Removed default values for excludusion list (--exclude-library).                    #
-#                  - [Bug Fixes] Fixed a bug causing index out of bounds errors                                    #
-#                    in the code for excluding special episodes/seasons.                                           #
-#                  - [Removed] Removed no longer needed code.                                                      #
-#                                                                                                                  #
-#       07/20/2024 - [Bug Fixes] Fixed a bug that caused the special episodes removal code to not work properly    #
-#                    when all episodes after special episodes have been watched.                                   #
-####################################################################################################################
+##################################################################################################################################################
+###                                                       Before running this script                                                           ###
+##################################################################################################################################################
+#  [Requirements]                                                                                                                                #
+#       The Library section names (same library type) for you're plex libraries must be unique.                                                  #
+#                                                                                                                                                #
+#                                                                                                                                                #
+#  [ChangeLog]                                                                                                                                   #
+#       07/19/2024 - [Improvements] Greatly reduced runtime of the script by reducing number of calls to plex                                    #
+#                    by generating the playlist and filling it at the same time.                                                                 #
+#                  - [Added Feature] Additional episodes of the same series will increment within the playlist.                                  #
+#                  - [Added Feature] Added blacklisting for Movie Selections.                                                                    #
+#                  - [Bug Fixes] Fixed a bug where passing a value into the --number argument that was larger than                               #
+#                    total possible number of media in the provided libraries would cause an infinite loop.                                      #
+#                  - [Removed] Removed default values for excludusion list (--exclude-library).                                                  #
+#                  - [Bug Fixes] Fixed a bug causing index out of bounds errors                                                                  #
+#                    in the code for excluding special episodes/seasons.                                                                         #
+#                  - [Removed] Removed no longer needed code.                                                                                    #
+#                                                                                                                                                #
+#       07/20/2024 - [Bug Fixes] Fixed a bug that caused the special episodes removal code to not work properly                                  #
+#                    when all episodes after special episodes have been watched.                                                                 #
+#                                                                                                                                                #
+#       07/27/2024 - [Improvements] Updated script to remove usage of plex elements (I.E. <MyPlexUser:123456789:TestUser>) data using .split()   #
+##################################################################################################################################################
 
 
 
@@ -728,10 +730,30 @@ def create_playlist(plex, account):
     allSections_Formatted_List = list()
     movieSections_Formatted_List = list()
     tvShowsSections_formatted_List = list()
-
+    
+    get_library_sections = plex.library.sections()
+    
     #Formatted to only contain the Names of the library sections
-    tvShowsSections_formatted_List = tv_shows_and_Movies_section_formatter(plex)
-    movieSections_Formatted_List = tv_shows_and_Movies_section_formatter(plex)
+    for getSection_data in get_library_sections:        
+        if getShowSectionSearcher in str(getSection_data):
+            tvShowsSections_formatted_List.append(getSection_data.title)
+            
+        elif getMovieSectionSearcher in str(getSection_data):
+            movieSections_Formatted_List.append(getSection_data.title)
+            
+        elif getMusicSectionSearcher in str(getSection_data):
+            logger.debug(f'\nThis script does not currently support the library section type \"{getMusicSection}\" for section \"{getSection_data.title}\".\n')
+            
+        elif getPhotoSectionSearcher in str(getSection_data):
+            logger.debug(f'\nThis script does not currently support the library section type \"{getPhotoSection}\" for section \"{getSection_data.title}\".\n')
+            
+        else:
+            print(f'\nError - Unknown section type for section \"{getSection_data.title}\".\n')
+            exit(1)
+            
+
+    logger.debug(f'tvShowsSections_formatted_List = {tvShowsSections_formatted_List}')
+    logger.debug(f'movieSections_Formatted_List = {movieSections_Formatted_List}')
 
     
     getAllShows = args.allshows
@@ -739,7 +761,6 @@ def create_playlist(plex, account):
     
     loopCount = 0  
     
-    #for loopCount in range(len(plex_all_library_sections)):
     for library in plex_all_library_sections:
 
         #Use a regex to match exactly the library sections, otherwise it will find any library containing the library variable 
@@ -801,7 +822,7 @@ def create_playlist(plex, account):
                 logger.debug(f'Removing library \"{library}\" from plex_all_tv_and_movie_library_sections_minus_exluded')
                 
                 selectionsToExcludeBasedOnWhatUserSelected_List.append(library)                   
-                logger.debug(f'Addiong library \"{library}\" to selectionsToExcludeBasedOnWhatUserSelected_List')
+                logger.debug(f'Adding library \"{library}\" to selectionsToExcludeBasedOnWhatUserSelected_List')
                 
             elif (args.allshows == True) and (args.allmovies == False):
                 if not foundMatchInAllShowsSection and foundInLibrarySectionMovieOrShow:
@@ -809,7 +830,7 @@ def create_playlist(plex, account):
                     logger.debug(f'Removing library \"{library}\" from plex_all_tv_and_movie_library_sections_minus_exluded')
                     
                     selectionsToExcludeBasedOnWhatUserSelected_List.append(library)                   
-                    logger.debug(f'Addiong library \"{library}\" to selectionsToExcludeBasedOnWhatUserSelected_List')
+                    logger.debug(f'Adding library \"{library}\" to selectionsToExcludeBasedOnWhatUserSelected_List')
 
             elif (args.allshows == False) and (args.allmovies == True):
                 if not foundMatchInAllMoviesSection and foundInLibrarySectionMovieOrShow:
@@ -817,7 +838,7 @@ def create_playlist(plex, account):
                     logger.debug(f'Removing library \"{library}\" from plex_all_tv_and_movie_library_sections_minus_exluded')
                     
                     selectionsToExcludeBasedOnWhatUserSelected_List.append(library)                   
-                    logger.debug(f'Addiong library \"{library}\" to selectionsToExcludeBasedOnWhatUserSelected_List')
+                    logger.debug(f'Adding library \"{library}\" to selectionsToExcludeBasedOnWhatUserSelected_List')
             
             #Else remove sections that are not in either movie or shows, because all shows and all movies must have been selected
             else:
@@ -826,7 +847,7 @@ def create_playlist(plex, account):
                     logger.debug(f'Removing library \"{library}\" from plex_all_tv_and_movie_library_sections_minus_exluded')
                     
                     selectionsToExcludeBasedOnWhatUserSelected_List.append(library)                   
-                    logger.debug(f'Addiong library \"{library}\" to selectionsToExcludeBasedOnWhatUserSelected_List')
+                    logger.debug(f'Adding library \"{library}\" to selectionsToExcludeBasedOnWhatUserSelected_List')
                 
    
     logger.debug(f'\n\nplex_all_tv_and_movie_library_sections_minus_exluded = {plex_all_tv_and_movie_library_sections_minus_exluded}\n')    
@@ -909,173 +930,6 @@ def get_isolate_and_format_plex_element(plexElements):
 
     return plexElementFormatted
 
-
-def tv_shows_and_Movies_section_formatter(plex):
-
-    getAllSections = plex.library.sections()
-    
-    #The name of the library sections type IE (MovieSection, ShowSection, MusicSection, PhotoSection) its used to query the type of data too grab from the plex API
-    getMovieSection = 'MovieSection'
-    getShowSection = 'ShowSection'
-    
-    #allMediaTypes = [getMovieSection, getShowSection, getMusicSection, getPhotoSection]
-    allVideoMediaTypes = [getMovieSection, getShowSection]
-    selectedMediaTypes = list()
-    
-    logger.debug(f'\nallVideoMediaTypes = {allVideoMediaTypes}\n')
-    
-    if(args.select_library != None) or (args.allshows == True):
-        selectedMediaTypes = [getShowSection]
-        #If both TV Shows and movies were selected
-        if(args.allmovies == True):
-            selectedMediaTypes = [getShowSection, getMovieSection]
-            
-        logger.debug(f'\nselectedMediaTypes = {selectedMediaTypes}\n')
-        
-    elif(args.allmovies == True):
-        selectedMediaTypes = [getMovieSection]
-        #If both TV Shows and movies were selected
-        if(args.select_library != None) or (args.allshows == True):
-            selectedMediaTypes = [getShowSection, getMovieSection]
-            
-        logger.debug(f'\nselectedMediaTypes = {selectedMediaTypes}\n')
-
-    else:
-        print(f'\nError - Unkown library selection type.\n')
-        exit(1)
-        
-    
-    #Return the full list of possible library section types and library names IE ([<ShowSection:1:TV-Shows>, <MusicSection:2:Anime-Music>, <MovieSection:3:Movies>])
-    getAllSections = plex.library.sections()
-    
-    allSections_String = str(getAllSections)
-    allShowSections_String = str()
-    allMovieSections_String = str()
-    
-    #Holds the Formatted Array for both All Movies and Shows only 
-    allSections_Formatted_List = list()
-    movieSections_Formatted_List = list()
-    tvShowsSections_formatted_List = list()
-    
-    
-    #Use a regex to remove spaces between commas in the users entry.
-    space_remover_regex = r'(^\s+|\s*,\s*|\s+$)'
-    getExcludeSection = re.sub(space_remover_regex,',', args.exclude_library)
-    #Assign Argument Data to variables
-    selectionsToExclude_List = (getExcludeSection).split(comma)
-    
-    getAllShows = args.allshows
-    getAllMovies = args.allmovies
- 
-    #This will have the total list from movie's section and tv shows sections (except the exluded data from 'selectionsToExclude')
-    fullSectionCounter = 0
-    movieSectionCounter = 0
-    tvShowSectionCounter = 0
-
-    if(args.select_library != None):
-        #Use a regex to remove spaces between commas in the users entry.
-        space_remover_regex = r'(^\s+|\s*,\s*|\s+$)'
-        getLibrarySection = re.sub(space_remover_regex,',', args.select_library)
-        #Split the args.select_library (--selectlibrary) argument and make it into a list
-        selectedLibrary_List = (getLibrarySection).split(comma)
-
-        logger.debug(f'selectedLibrary_List = {selectedLibrary_List}')
-        
-    #Split all Plex Sections and make it into a list
-    allSections_List = allSections_String.split(comma)
-
-    #use to query and find show sections from the for command if statement
-    getShowSectionSearcher = '<' + getShowSection + colon
-    getMovieSectionSearcher = '<' + getMovieSection + colon
-    
-    #Used to determine if a comma should be placed between the string concatination (add comma after 1st entry is added)
-    countShows = 0
-    countMovies = 0
-    for section in allSections_List: 
-        if getShowSectionSearcher in section:
-            if countShows == 0:
-                allShowSections_String = allShowSections_String + section
-            else:
-                allShowSections_String = allShowSections_String + comma + section
-            
-            countShows += 1
-        elif getMovieSectionSearcher in section:
-            if countMovies == 0:
-                allMovieSections_String = allMovieSections_String + section
-            else:
-                allMovieSections_String = allMovieSections_String + comma + section
-            countMovies += 1
-        else:
-            logger.debug(f'NOT result of section = {section}\n')
-    
-    
-    
-    allShowSections_List = allShowSections_String.split(comma)
-    allMovieSections_List = allMovieSections_String.split(comma)
-
-    if ((args.allshows == True) or (args.select_library != None)) and (args.allmovies == True):
-        #Format All Show Sections properly and make it iterable. Then Assign it to allSections_Formatted_List in order to uuse it in the below for loop
-        allSections_Formatted_List = get_isolate_and_format_plex_element(allSections_List)
-        
-        for section in allSections_Formatted_List:
-            if section in selectionsToExclude_List:
-                allSections_Formatted_List.remove(section)
-            elif (args.select_library != None) and (section not in selectedLibrary_List):
-                allSections_Formatted_List.remove(section)
-        
-        logger.debug(f'\n[Using All Shows, and Using All Movies]')
-        logger.debug(f'allSections_Formatted_List: {allSections_Formatted_List}\n')
-        
-        return allSections_Formatted_List
-        
-    elif (args.allshows == True) and (args.allmovies == False):
-        #Format All Show Sections properly and make it iterable. Then Assign it to allSections_Formatted_List in order to uuse it in the below for loop
-        tvShowsSections_formatted_List = get_isolate_and_format_plex_element(allShowSections_List)
-        
-        for section in tvShowsSections_formatted_List:
-            if section in selectionsToExclude_List:
-                tvShowsSections_formatted_List.remove(section)
-            elif (args.select_library != None) and (section not in selectedLibrary_List):
-                tvShowsSections_formatted_List.remove(section)
-        
-        logger.debug(f'\n[Using All Shows]')
-        logger.debug(f'tvShowsSections_formatted_List: {tvShowsSections_formatted_List}\n')
-        
-        return tvShowsSections_formatted_List
-    elif (args.allshows == False) and (args.allmovies == True):
-        #Format All Movies Sections properly and make it iterable. Then Assign it to allSections_Formatted_List in order to uuse it in the below for loop
-        movieSections_Formatted_List = get_isolate_and_format_plex_element(allMovieSections_List)
-        
-        for section in movieSections_Formatted_List:
-            if section in selectionsToExclude_List:
-                movieSections_Formatted_List.remove(section)
-            elif (args.select_library != None) and (section not in selectedLibrary_List):
-                movieSections_Formatted_List.remove(section)
-        
-        
-        logger.debug(f'\n[Using All Movies]')
-        logger.debug(f'movieSections_Formatted_List: {movieSections_Formatted_List}\n')
-        
-        return movieSections_Formatted_List
-    
-    
-    elif(args.select_library != None):
-        
-        allSections_Formatted_List = get_isolate_and_format_plex_element(allSections_List)
-        
-        for section in allSections_Formatted_List:
-            if section not in selectionsToExclude_List:
-                allSections_Formatted_List.remove(section)
-
-        
-        logger.debug(f'\n[Using All Shows, and Using All Movies]\n')
-        logger.debug(f'allSections_Formatted_List: {allSections_Formatted_List}\n')
-        
-        return allSections_Formatted_List
-    
-    else:
-        print(f'ERROR - Unable to generate formatted Library Sections.')
-        exit(1)
     
 
 def fetch_plex_api(path='', method='GET', plextv=False, **kwargs):
@@ -1144,7 +998,6 @@ def get_user_id(server_id):
 
 
 #Generate the users playlist for Server Method
-#def generate_all_users_playlist_via_server_method(base_url, authToken, homeUsers):
 def generate_all_users_playlist_via_server_method(base_url, authToken, homeUsers=None):
 
     getAllUsers = 'all'
@@ -1181,7 +1034,10 @@ def generate_all_users_playlist_via_server_method(base_url, authToken, homeUsers
         setAllHomeUsers = False
 
     #Get A list of all Home Users
-    plex_users = get_user_tokens(plex_server.machineIdentifier)
+    plex_users = list()
+    get_plex_users = plex_server.myPlexAccount().users()
+    for plex_user in get_plex_users:
+        plex_users.append(plex_user.title)
 
     #If the user selected the --adminuser argument the script will also add the library to the admin account
     if(args.adminuser == True):
@@ -1200,26 +1056,26 @@ def generate_all_users_playlist_via_server_method(base_url, authToken, homeUsers
 
             adminUser = plex_server.myPlexAccount()
             #Get the Admin User Account Name
-            adminUser = get_isolate_and_format_plex_element(str(adminUser))
+            adminUsername = adminUser.title
 
-            print(f'\n-----------[BEGIN]-------------- {adminUser} -------------[BEGIN]--------------')
+            print(f'\n-----------[BEGIN]-------------- {adminUsername} -------------[BEGIN]--------------')
             
-            print(f'\nCurrent User [Admin]: {adminUser}')
+            print(f'\nCurrent User [Admin]: {adminUsername}')
 
             #If the --purge argument was passed in then delete the playlist if it exist
             if(args.purge == True):
-                delete_playlist(plex_server, adminUser, args.name)
+                delete_playlist(plex_server, adminUsername, args.name)
             else:
                 print(f'Creating playlist \"{args.name}\" ...')
-                create_playlist(plex_server, adminUser)
-                print(f'\nPlaylist creation for user [{adminUser}] - COMPLETED\n')
-            print(f'------------[END]------------- {adminUser} --------------[END]-------------\n')  
+                create_playlist(plex_server, adminUsername)
+                print(f'\nPlaylist creation for user [{adminUsername}] - COMPLETED\n')
+            print(f'------------[END]------------- {adminUsername} --------------[END]-------------\n')  
 
         except Unauthorized:
-            print(f'User \"{adminUser}\" is Unauthorized to access the Plex Home \"{args.resource}\"')
+            print(f'User \"{adminUsername}\" is Unauthorized to access the Plex Home \"{args.resource}\"')
 
         except NotFound:
-            print(f'User \"{adminUser}\" is not in the Plex Home \"{args.resource}\"')
+            print(f'User \"{adminUsername}\" is not in the Plex Home \"{args.resource}\"')
     
     if setAllHomeUsers == True:
         print('\n###Obtaining Home Users [ALL USERS]###\n\n')
@@ -1287,7 +1143,10 @@ def generate_all_users_playlist_via_account_method(plexConnection, accountInfo, 
     getAllUsers = 'all'
     
     #list of All plex users
-    allHomeUsers = get_isolate_and_format_plex_element(plexConnection.myPlexAccount().users())
+    allHomeUsers = list()
+    get_plex_users = plexConnection.myPlexAccount().users()
+    for plex_user in get_plex_users:
+        allHomeUsers.append(plex_user.title)
     
     logger.debug(f'list home users: {homeUsers}')
 
@@ -1328,26 +1187,26 @@ def generate_all_users_playlist_via_account_method(plexConnection, accountInfo, 
 
             adminUser = plexConnection.myPlexAccount()
             #Get the Admin User Account Name
-            adminUser = get_isolate_and_format_plex_element(str(adminUser))
+            adminUsername = adminUser.title
 
-            print(f'\n-----------[BEGIN]-------------- {adminUser} -------------[BEGIN]--------------')
+            print(f'\n-----------[BEGIN]-------------- {adminUsername} -------------[BEGIN]--------------')
             
-            print(f'\nCurrent User [Admin]: {adminUser}\n')
+            print(f'\nCurrent User [Admin]: {adminUsername}\n')
 
             #If the --purge argument was passed in then delete the playlist if it exist
             if(args.purge == True):
                 delete_playlist(plexConnection, adminUser, args.name)
             else:
                 print(f'Creating playlist \"{args.name}\" ...')
-                create_playlist(plexConnection, adminUser)
-                print(f'\nPlaylist creation for user [{adminUser}] - COMPLETED\n')
-            print(f'------------[END]------------- {adminUser} --------------[END]-------------\n')  
+                create_playlist(plexConnection, adminUsername)
+                print(f'\nPlaylist creation for user [{adminUsername}] - COMPLETED\n')
+            print(f'------------[END]------------- {adminUsername} --------------[END]-------------\n')  
 
         except Unauthorized:
-            print(f'User \"{adminUser}\" is Unauthorized to access the Plex Home \"{args.resource}\"')
+            print(f'User \"{adminUsername}\" is Unauthorized to access the Plex Home \"{args.resource}\"')
 
         except NotFound:
-            print(f'User \"{adminUser}\" is not in the Plex Home \"{args.resource}\"')
+            print(f'User \"{adminUsername}\" is not in the Plex Home \"{args.resource}\"')
     
     #If the user passed in the word "all" as a home user the script will run for every home user profile
     if setAllHomeUsers == True:
