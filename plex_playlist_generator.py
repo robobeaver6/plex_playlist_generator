@@ -63,6 +63,8 @@ BLACKLIST = ['Downton Abbey',
 #                    when all episodes after special episodes have been watched.                                                                 #
 #                                                                                                                                                #
 #       07/27/2024 - [Improvements] Updated script to remove usage of plex elements (I.E. <MyPlexUser:123456789:TestUser>) data using .split()   #
+#                                                                                                                                                #
+#       07/28/2024 - [Improvements] Added more error checking when selecting all Home Users.                                                      #
 ##################################################################################################################################################
 
 
@@ -876,60 +878,6 @@ def create_playlist(plex, account):
 
     return plex
 
-
-#Take the imported data from a plex object and reformat it to only have data after the the last colon of each element, and also any carrot symbols.
-#This also converts any hyphens to a space since Plex saves spaces as Hyphens for plex objects
-# I.E [<MyPlexUser:123456789:Plex-User>] would become ['Plex User']
-def get_isolate_and_format_plex_element(plexElements):
-
-    try:
-        plexElementFormatted = list()
-                
-        if(type(plexElements) == str):
-            plexElements = str(plexElements).replace('-', ' ')
-
-            #split the data by colons and keep the last splits data
-            plexElements = plexElements.split(colon)[-1]
-
-            #remove the last character from the data because after using the split command above, the last character will be a '>' character
-            plexElements = plexElements[:-1]
-
-            #If the First character is a less than carrot, remove it
-            if plexElements[1:] == '<':
-                plexElements = plexElements.replace('<', '', 1)
-
-            #If the Last character is a greater than carrot, remove it
-            if plexElements[-1:] == '>':
-                plexElements = plexElements.replace('>', '', 1)
-
-            plexElementFormatted = plexElements
-            
-        else:
-            for plexElement in plexElements:
-
-                plexElement = str(plexElement).replace('-', ' ')
-
-                #split the data by colons and keep the last splits data
-                plexElement = plexElement.split(colon)[-1]
-
-                #remove the last character from the data because after using the split command above, the last character will be a '>' character
-                plexElement = plexElement[:-1]
-                
-                #If the First character is a less than carrot, remove it
-                if plexElement[1:] == '<':
-                    plexElement = plexElement.replace('<', '', 1)
-
-                #If the Last character is a greater than carrot, remove it
-                if plexElement[-1:] == '>':
-                    plexElement = plexElement.replace('>', '', 1)
-                    
-                plexElementFormatted.append(plexElement)
-        
-    except:
-        print(f'Unable to format the Element \"{plexElements}\"')
-
-    return plexElementFormatted
-
     
 
 def fetch_plex_api(path='', method='GET', plextv=False, **kwargs):
@@ -1000,8 +948,6 @@ def get_user_id(server_id):
 #Generate the users playlist for Server Method
 def generate_all_users_playlist_via_server_method(base_url, authToken, homeUsers=None):
 
-    getAllUsers = 'all'
-
     try:
         plex_server = PlexServer(baseurl=base_url, token=authToken, session=None)
         logger.debug('\nGetting Library Sections...\n')
@@ -1015,29 +961,46 @@ def generate_all_users_playlist_via_server_method(base_url, authToken, homeUsers
 
     #If Home Users was selected check to see if it contains 'all'
     if(args.homeusers != None):
+        
+        getAllUsers = 'all'
+                    
         #If the User passed in the string 'all' (case incensitive) into the argument --homeusers.
         #Regardless of if it is the only entry or within the list, then set the variable setAllHomeUsers to true.
         if getAllUsers.lower() in (homeUser.lower() for homeUser in homeUsers):
             print(f'\nFull List of Home Users Requested. \n')
-
             print('Retrieving All Home Users ...\n')
-            
-            setAllHomeUsers = True
-            allHomeUsers = get_isolate_and_format_plex_element(plex_server.myPlexAccount().users())
-
-            logger.debug(f'\nAll Home Users: {allHomeUsers}\n')
-
+        
+            try:
+                #list of All plex users
+                allHomeUsers = list()
+                get_plex_users = plex_server.myPlexAccount().users()
+                
+                for plex_user in get_plex_users:
+                    allHomeUsers.append(plex_user.title)
+                
+                logger.debug(f'list home users: {homeUsers}')
+                logger.debug(f'\nplex_library_sections = {plex_library_sections}\n')
+                
+                #If there are no HomeUsers even though the user supplied the argument to use homeUsers
+                if not allHomeUsers:
+                    print(f'\nError - No Home Users available for \"{args.resource}\".\n')
+                    exit(1)
+                    
+                else:
+                    logger.debug(f'\nAll Home Users: {allHomeUsers}\n')
+                    setAllHomeUsers = True
+                    logger.debug(f'\nAll Home Users: {allHomeUsers}\n')
+                
+            except NotFound:
+                print(f'\nError - No Home Users available for \"{args.resource}\".\n')
+                exit(1)
+                
         else:
             setAllHomeUsers = False
             
     else:
         setAllHomeUsers = False
 
-    #Get A list of all Home Users
-    plex_users = list()
-    get_plex_users = plex_server.myPlexAccount().users()
-    for plex_user in get_plex_users:
-        plex_users.append(plex_user.title)
 
     #If the user selected the --adminuser argument the script will also add the library to the admin account
     if(args.adminuser == True):
@@ -1140,33 +1103,54 @@ def generate_all_users_playlist_via_server_method(base_url, authToken, homeUsers
 
 def generate_all_users_playlist_via_account_method(plexConnection, accountInfo, homeUsers):
 
-    getAllUsers = 'all'
-    
-    #list of All plex users
-    allHomeUsers = list()
-    get_plex_users = plexConnection.myPlexAccount().users()
-    for plex_user in get_plex_users:
-        allHomeUsers.append(plex_user.title)
-    
-    logger.debug(f'list home users: {homeUsers}')
+    try:
+        plex_library_sections = plexConnection.library.sections()
+        logger.debug(f'Plex Sections: {plex_library_sections}\n')
 
-    logger.debug(f'\nplex_account = {accountInfo}\n')
-    plex_library_sections = plexConnection.library.sections()
-    logger.debug(f'\nplex_library_sections = {plex_library_sections}\n')
+    except Unauthorized:
+        print(f'The Server details could not be authenticated.')
+        exit(1)
 
     #If Home Users was selected, check to see if it contains 'all'
     if(args.homeusers != None):
+    
+        getAllUsers = 'all'
+
         #If the User passed in the string 'all' (case incensitive) into the argument --homeusers.
         #Regardless of if it is the only entry or within the list, then set the variable setAllHomeUsers to true.
         if getAllUsers.lower() in (homeUser.lower() for homeUser in homeUsers):
             print(f'\nFull List of Home Users Requested. {homeUsers}\n')
             print('Retrieving All Home Users ...\n')
             
-            setAllHomeUsers = True
-
-            logger.debug(f'\nAll Home Users: {allHomeUsers}\n')
+            try:           
+                #list of All plex users
+                allHomeUsers = list()
+                get_plex_users = plexConnection.myPlexAccount().users()
+                
+                for plex_user in get_plex_users:
+                    allHomeUsers.append(plex_user.title)
+                
+                logger.debug(f'list home users: {homeUsers}')
+                logger.debug(f'\nplex_account = {accountInfo}\n')
+                logger.debug(f'\nplex_library_sections = {plex_library_sections}\n')
+                
+                #If there are no HomeUsers even though the user supplied the argument to use homeUsers
+                if not allHomeUsers:
+                    print(f'\nError - No Home Users available for \"{args.resource}\".\n')
+                    exit(1)
+                    
+                else:
+                    logger.debug(f'\nAll Home Users: {allHomeUsers}\n')                  
+                    setAllHomeUsers = True
+                    logger.debug(f'\nAll Home Users: {allHomeUsers}\n')
+                
+            except NotFound:
+                print(f'\nError - No Home Users available for \"{args.resource}\".\n')
+                exit(1)
+                
         else:
             setAllHomeUsers = False
+
     else:
         setAllHomeUsers = False
     
