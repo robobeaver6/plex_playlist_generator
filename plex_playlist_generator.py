@@ -64,7 +64,7 @@ BLACKLIST = ['Downton Abbey',
 #                                                                                                                                                #
 #       07/27/2024 - [Improvements] Updated script to remove usage of plex elements (I.E. <MyPlexUser:123456789:TestUser>) data using .split()   #
 #                                                                                                                                                #
-#       07/28/2024 - [Improvements] Added more error checking when selecting all Home Users.                                                      #
+#       07/28/2024 - [Improvements] Added more error checking when selecting all Home Users. Added exceptions for Bad Requests.                  #
 ##################################################################################################################################################
 
 
@@ -405,7 +405,8 @@ def delete_playlist(plex, account, playlistName):
             time.sleep(10)
 
     except BadRequest as e:
-        print(f'Error - BadRequest',e)
+        print(f'\nError - BadRequest: {e}\n')
+        exit(1)
 
 
 #Loops through and builds the playlist
@@ -447,7 +448,6 @@ def build_playlist(plex, userName, plex_refined_library_sections, selectionsToEx
 
         episode_or_movie = get_random_episodes_or_movies(plex, plex_refined_library_sections, args.number)
         
-
         try:
             #If a playlist with the same name already exist, delete it
             if plex.playlist(title=args.name):
@@ -1039,6 +1039,10 @@ def generate_all_users_playlist_via_server_method(base_url, authToken, homeUsers
 
         except NotFound:
             print(f'User \"{adminUsername}\" is not in the Plex Home \"{args.resource}\"')
+            
+        except BadRequest as e:
+            print(f'\nError - BadRequest: {e}\n')
+            exit(1)            
     
     if setAllHomeUsers == True:
         print('\n###Obtaining Home Users [ALL USERS]###\n\n')
@@ -1062,11 +1066,18 @@ def generate_all_users_playlist_via_server_method(base_url, authToken, homeUsers
                     print(f'\nPlaylist creation for user [{plex_user}] - COMPLETED\n')
                 print(f'------------[END]------------- {plex_user} --------------[END]-------------')
                     
+                if(args.purge != None):
+                    time.sleep(5)
+                                            
             except Unauthorized:
                 print(f'User \"{plex_user}\" is Unauthorized to access the Plex Home \"{args.resource}\"')
 
             except NotFound:
                 print(f'User \"{plex_user}\" is not in the Plex Home \"{args.resource}\"')
+                
+            except BadRequest as e:
+                print(f'\nError - BadRequest: {e}\n')
+                exit(1)
                 
     else:                
         for homeUser in homeUsers:        
@@ -1091,12 +1102,20 @@ def generate_all_users_playlist_via_server_method(base_url, authToken, homeUsers
                         create_playlist(runningAsUser, homeUser)
                         print(f'\nPlaylist creation for user [{homeUser}] - COMPLETED\n')                        
                     print(f'------------[END]------------- {homeUser} --------------[END]-------------')  
-
+                    
+                    if(args.purge != None):
+                        time.sleep(5)
+                        
                 except Unauthorized:
                     print(f'User \"{homeUser}\" is Unauthorized to access the Plex Home \"{args.resource}\"')
 
                 except NotFound:
                     print(f'User \"{homeUser}\" is not in the Plex Home \"{args.resource}\"')
+                    
+                except BadRequest as e:
+                    print(f'\nError - BadRequest: {e}\n')
+                    exit(1)
+                    
             else:
                 continue
 
@@ -1191,6 +1210,11 @@ def generate_all_users_playlist_via_account_method(plexConnection, accountInfo, 
 
         except NotFound:
             print(f'User \"{adminUsername}\" is not in the Plex Home \"{args.resource}\"')
+            
+        except BadRequest as e:
+            print(f'\nError - BadRequest: {e}\n')
+            exit(1)            
+                
     
     #If the user passed in the word "all" as a home user the script will run for every home user profile
     if setAllHomeUsers == True:
@@ -1215,11 +1239,18 @@ def generate_all_users_playlist_via_account_method(plexConnection, accountInfo, 
                     print(f'\nPlaylist creation for user [{plex_user}] - COMPLETED\n')
                 print(f'------------[END]------------- {plex_user} --------------[END]-------------')
                     
+                if(args.purge != None):
+                    time.sleep(5)
+                    
             except Unauthorized:
                 print(f'User \"{plex_user}\" is Unauthorized to access the Plex Home \"{args.resource}\"')
 
             except NotFound:
                 print(f'User \"{plex_user}\" is not in the Plex Home \"{args.resource}\"')
+                
+            except BadRequest as e:
+                print(f'\nError - BadRequest: {e}\n')
+                exit(1)
                 
     else:                
         for homeUser in homeUsers:        
@@ -1244,12 +1275,20 @@ def generate_all_users_playlist_via_account_method(plexConnection, accountInfo, 
                         create_playlist(runningAsUser, homeUser)
                         print(f'\nPlaylist creation for user [{homeUser}] - COMPLETED\n')                        
                     print(f'------------[END]------------- {homeUser} --------------[END]-------------')  
-
+                    
+                    if(args.purge != None):
+                        time.sleep(5)
+                        
                 except Unauthorized:
                     print(f'User \"{homeUser}\" is Unauthorized to access the Plex Home \"{args.resource}\"')
 
                 except NotFound:
                     print(f'User \"{homeUser}\" is not in the Plex Home \"{args.resource}\"')
+                    
+                except BadRequest as e:
+                    print(f'\nError - BadRequest: {e}\n')
+                    exit(1)
+                    
             else:
                 continue
 
@@ -1354,7 +1393,11 @@ def main():
             except Unauthorized:
                 print(f'The Username and password could not be authenticated.')
                 exit(1)
-                
+            
+            except BadRequest as e:
+                print(f'\nError - BadRequest: {e}\n')
+                exit(1)            
+                    
             #Generate Playlist for the requested Account (Method) Users
             if (args.homeusers != False):
                 generate_all_users_playlist_via_account_method(plex, account, homeUsers)
