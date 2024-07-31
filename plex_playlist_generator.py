@@ -65,6 +65,8 @@ BLACKLIST = ['Downton Abbey',
 #       07/27/2024 - [Improvements] Updated script to remove usage of plex elements (I.E. <MyPlexUser:123456789:TestUser>) data using .split()   #
 #                                                                                                                                                #
 #       07/28/2024 - [Improvements] Added more error checking when selecting all Home Users. Added exceptions for Bad Requests.                  #
+#                                                                                                                                                #
+#       07/31/2024 - [Bug Fixes] Fixed a bug that caused home users to not be selected in certain instances.                                     #
 ##################################################################################################################################################
 
 
@@ -963,38 +965,37 @@ def generate_all_users_playlist_via_server_method(base_url, authToken, homeUsers
     if(args.homeusers != None):
         
         getAllUsers = 'all'
+    
+        try:
+            #list of All plex users
+            allHomeUsers = list()
+            get_plex_users = plex_server.myPlexAccount().users()
+            
+            print('Retrieving All Home Users ...\n')
+            
+            for plex_user in get_plex_users:
+                allHomeUsers.append(plex_user.title)
+            
+            logger.debug(f'list home users: {homeUsers}')
+            logger.debug(f'\nplex_library_sections = {plex_library_sections}\n')
+            
+            #If there are no HomeUsers even though the user supplied the argument to use homeUsers
+            if not allHomeUsers:
+                print(f'\nError - No Home Users available for \"{args.resource}\".\n')
+                exit(1)
+            
+        except NotFound:
+            print(f'\nError - No Home Users available for \"{args.resource}\".\n')
+            exit(1)
+        
                     
         #If the User passed in the string 'all' (case incensitive) into the argument --homeusers.
         #Regardless of if it is the only entry or within the list, then set the variable setAllHomeUsers to true.
         if getAllUsers.lower() in (homeUser.lower() for homeUser in homeUsers):
             print(f'\nFull List of Home Users Requested. \n')
-            print('Retrieving All Home Users ...\n')
-        
-            try:
-                #list of All plex users
-                allHomeUsers = list()
-                get_plex_users = plex_server.myPlexAccount().users()
-                
-                for plex_user in get_plex_users:
-                    allHomeUsers.append(plex_user.title)
-                
-                logger.debug(f'list home users: {homeUsers}')
-                logger.debug(f'\nplex_library_sections = {plex_library_sections}\n')
-                
-                #If there are no HomeUsers even though the user supplied the argument to use homeUsers
-                if not allHomeUsers:
-                    print(f'\nError - No Home Users available for \"{args.resource}\".\n')
-                    exit(1)
-                    
-                else:
-                    logger.debug(f'\nAll Home Users: {allHomeUsers}\n')
-                    setAllHomeUsers = True
-                    logger.debug(f'\nAll Home Users: {allHomeUsers}\n')
-                
-            except NotFound:
-                print(f'\nError - No Home Users available for \"{args.resource}\".\n')
-                exit(1)
-                
+            logger.debug(f'\nAll Home Users: {allHomeUsers}\n')
+            setAllHomeUsers = True
+          
         else:
             setAllHomeUsers = False
             
@@ -1134,39 +1135,37 @@ def generate_all_users_playlist_via_account_method(plexConnection, accountInfo, 
     if(args.homeusers != None):
     
         getAllUsers = 'all'
+        
+        try:           
+            #list of All plex users
+            allHomeUsers = list()
+            get_plex_users = plexConnection.myPlexAccount().users()
+            
+            print('Retrieving All Home Users ...\n')
+            
+            for plex_user in get_plex_users:
+                allHomeUsers.append(plex_user.title)
+            
+            logger.debug(f'list home users: {homeUsers}')
+            logger.debug(f'\nplex_account = {accountInfo}\n')
+            logger.debug(f'\nplex_library_sections = {plex_library_sections}\n')
+            
+            #If there are no HomeUsers even though the user supplied the argument to use homeUsers
+            if not allHomeUsers:
+                print(f'\nError - No Home Users available for \"{args.resource}\".\n')
+                exit(1)
+
+        except NotFound:
+            print(f'\nError - No Home Users available for \"{args.resource}\".\n')
+            exit(1)
 
         #If the User passed in the string 'all' (case incensitive) into the argument --homeusers.
         #Regardless of if it is the only entry or within the list, then set the variable setAllHomeUsers to true.
         if getAllUsers.lower() in (homeUser.lower() for homeUser in homeUsers):
             print(f'\nFull List of Home Users Requested. {homeUsers}\n')
-            print('Retrieving All Home Users ...\n')
-            
-            try:           
-                #list of All plex users
-                allHomeUsers = list()
-                get_plex_users = plexConnection.myPlexAccount().users()
-                
-                for plex_user in get_plex_users:
-                    allHomeUsers.append(plex_user.title)
-                
-                logger.debug(f'list home users: {homeUsers}')
-                logger.debug(f'\nplex_account = {accountInfo}\n')
-                logger.debug(f'\nplex_library_sections = {plex_library_sections}\n')
-                
-                #If there are no HomeUsers even though the user supplied the argument to use homeUsers
-                if not allHomeUsers:
-                    print(f'\nError - No Home Users available for \"{args.resource}\".\n')
-                    exit(1)
-                    
-                else:
-                    logger.debug(f'\nAll Home Users: {allHomeUsers}\n')                  
-                    setAllHomeUsers = True
-                    logger.debug(f'\nAll Home Users: {allHomeUsers}\n')
-                
-            except NotFound:
-                print(f'\nError - No Home Users available for \"{args.resource}\".\n')
-                exit(1)
-                
+            logger.debug(f'\nAll Home Users: {allHomeUsers}\n')                  
+            setAllHomeUsers = True
+
         else:
             setAllHomeUsers = False
 
