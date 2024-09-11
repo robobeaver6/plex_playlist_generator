@@ -185,7 +185,6 @@ def get_random_episodes_or_movies(plex, all_provided_sections, requested_playlis
                 logger.debug(f'GET_EPISODES: Show Blacklisted: {show.title}')
                 continue
             if args.include_watched is True:
-                #show_episodes[show.title] = show.episodes()
                 #Grab Watched Episodes but ignore Season 0 (Specials)
                 show_episodes[show.title] = show.episodes(parentIndex__gt=0)
             else:
@@ -561,7 +560,6 @@ def build_playlist(plex, userName, plex_refined_library_sections, selectionsToEx
                     print(f'\nExcluded Library Sections: {selectionsToExclude_List}')
         
                 logger.debug(f'\n\nepisode [label] = {(episode_movie.TYPE)}\n\n')
-                #print(f'\nplexMovieType = {plexMovieType}\n')
                 season_episode = episode_movie.seasonEpisode      
                 print(f'\nAdded to Playlist [{args.name}]: \"{episode_movie.grandparentTitle} - {episode_movie.parentTitle} - '
                       f'Ep.0{episode_movie.index} - {episode_movie.title}\"')
@@ -572,9 +570,7 @@ def build_playlist(plex, userName, plex_refined_library_sections, selectionsToEx
            
     #For Movies Only      
     elif (args.allshows == False) and (args.allmovies == True):
-        #movies = get_random_movies(all_Shows_or_Movies_Library_Selection, n=1)
         episode_or_movie = get_random_episodes_or_movies(plex, plex_refined_library_sections, args.number)
-        
         
         try:
             #If a playlist with the same name already exist, delete it
@@ -649,7 +645,6 @@ def create_playlist(plex, account):
         allSections_List.append(section.title)
     
     #for the section in allSections (converted to String):
-    #allSections_String = str(getAllSections)
     allShowSections_String = str()
     allMovieSections_String = str()
     
@@ -674,7 +669,6 @@ def create_playlist(plex, account):
         
     #If the user did NOT Select The library selection, default plex_all_tv_and_movie_library_sections_minus_exluded to a Default of the full list of sections in order to remove from the list anything that is in the excluded list
     else:
-        #plex_all_tv_and_movie_library_sections_minus_exluded = allSections_List
         plex_all_tv_and_movie_library_sections_minus_exluded = list()
         
         #Used to build a list of everything that was excluded 
