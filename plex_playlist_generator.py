@@ -67,6 +67,9 @@ BLACKLIST = ['Downton Abbey',
 #       07/28/2024 - [Improvements] Added more error checking when selecting all Home Users. Added exceptions for Bad Requests.                  #
 #                                                                                                                                                #
 #       07/31/2024 - [Bug Fixes] Fixed a bug that caused home users to not be selected in certain instances.                                     #
+#                                                                                                                                                #
+#       09/10/2024 - [Bug Fixes] Fixed a bug that resulted in a NameError when the provided users are invalid.                                   #
+#                  - [Added Feature] Resource argument is now required for server connection method (due to the switching of users).             #
 ##################################################################################################################################################
 
 
@@ -1080,13 +1083,16 @@ def generate_all_users_playlist_via_server_method(base_url, authToken, homeUsers
                 print(f'\nError - BadRequest: {e}\n')
                 exit(1)
                 
-    else:                
-        for homeUser in homeUsers:        
-            if homeUser in plex_users:
+    else:
+        #Used to count the number of valid Home Users entered by the user.
+        numberValidHomeUsersEntered = 0
+        
+        for homeUser in homeUsers:
+            if homeUser in allHomeUsers:
                 try:
                     #if plex_user in homeUsers: 
                     logger.debug('\nChecking if the user is a Plex Home guest...\n')
-                    logger.debug(f'\nHome User [matched]: {str(homeUser)}\n')    
+                    logger.debug(f'\nHome User [matched]: {homeUser}\n')      
                     logger.debug(f'Switching to user: [{homeUser}] ...\n')
                     
                     print(f'-----------[BEGIN]-------------- {homeUser} -------------[BEGIN]--------------')
@@ -1097,16 +1103,23 @@ def generate_all_users_playlist_via_server_method(base_url, authToken, homeUsers
 
                     #If the --purge argument was passed in then delete the playlist if it exist
                     if(args.purge == True):
-                        delete_playlist(runningAsUser, homeUser, args.name) 
+                        delete_playlist(runningAsUser, homeUser, args.name)
+                        
+                        #Increment the valid entered user count
+                        numberValidHomeUsersEntered += 1
                     else:
                         print(f'Creating playlist \"{args.name}\" ...')
                         create_playlist(runningAsUser, homeUser)
-                        print(f'\nPlaylist creation for user [{homeUser}] - COMPLETED\n')                        
+                        print(f'\nPlaylist creation for user [{homeUser}] - COMPLETED\n')
+                        
+                        #Increment the valid entered user count
+                        numberValidHomeUsersEntered += 1
                     print(f'------------[END]------------- {homeUser} --------------[END]-------------')  
                     
                     if(args.purge != None):
                         time.sleep(5)
                         
+                                            
                 except Unauthorized:
                     print(f'User \"{homeUser}\" is Unauthorized to access the Plex Home \"{args.resource}\"')
 
@@ -1119,6 +1132,11 @@ def generate_all_users_playlist_via_server_method(base_url, authToken, homeUsers
                     
             else:
                 continue
+                
+        #If none of the users entered by the user are valid
+        if (numberValidHomeUsersEntered <= 0):
+            print(f'\nError - No Valid Home Users Submitted.\n')
+            exit(1)
 
 
 def generate_all_users_playlist_via_account_method(plexConnection, accountInfo, homeUsers):
@@ -1251,7 +1269,10 @@ def generate_all_users_playlist_via_account_method(plexConnection, accountInfo, 
                 print(f'\nError - BadRequest: {e}\n')
                 exit(1)
                 
-    else:                
+    else:
+        #Used to count the number of valid Home Users entered by the user.
+        numberValidHomeUsersEntered = 0
+        
         for homeUser in homeUsers:        
             if homeUser in allHomeUsers:
                 try:
@@ -1268,11 +1289,17 @@ def generate_all_users_playlist_via_account_method(plexConnection, accountInfo, 
 
                     #If the --purge argument was passed in then delete the playlist if it exist
                     if(args.purge == True):
-                        delete_playlist(runningAsUser, homeUser, args.name) 
+                        delete_playlist(runningAsUser, homeUser, args.name)
+
+                        #Increment the valid entered user count
+                        numberValidHomeUsersEntered += 1                        
                     else:
                         print(f'Creating playlist \"{args.name}\" ...')
                         create_playlist(runningAsUser, homeUser)
-                        print(f'\nPlaylist creation for user [{homeUser}] - COMPLETED\n')                        
+                        print(f'\nPlaylist creation for user [{homeUser}] - COMPLETED\n')
+                        
+                        #Increment the valid entered user count
+                        numberValidHomeUsersEntered += 1                        
                     print(f'------------[END]------------- {homeUser} --------------[END]-------------')  
                     
                     if(args.purge != None):
@@ -1291,6 +1318,11 @@ def generate_all_users_playlist_via_account_method(plexConnection, accountInfo, 
             else:
                 continue
 
+        #If none of the users entered by the user are valid
+        if (numberValidHomeUsersEntered <= 0):
+            print(f'\nError - No Valid Home Users Submitted.\n')
+            exit(1)
+            
 
 def main():
     global args
@@ -1362,7 +1394,7 @@ def main():
         if args.debug:
             logger.setLevel(logging.DEBUG)
             
-        #If the authorization method is Server
+        #If the authorization method is Account
         if (args.account == True) and (args.server == False):
         
             #If the username argument is empty or missing
@@ -1413,6 +1445,11 @@ def main():
             #If the auth token argument is empty or missing
             elif(args.token == None) or (args.token == ""):
                 print(f'\nThe Auth Token is required and cannot be empty.\n')
+                exit(1)
+
+            #If the resource argument is empty or missing
+            if(args.resource == None) or (args.resource == ""):
+                print(f'\nThe argument \"--resource\" is required for the server connection method, and cannot be empty.\n')
                 exit(1)
 
             #Connect via Direct URL
