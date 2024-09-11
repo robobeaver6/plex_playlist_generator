@@ -1278,7 +1278,7 @@ def generate_all_users_playlist_via_account_method(plexConnection, accountInfo, 
                 try:
                     #if plex_user in homeUsers: 
                     logger.debug('\nChecking if the user is a Plex Home guest...\n')
-                    logger.debug(f'\nHome User [matched]: {str(homeUser)}\n')    
+                    logger.debug(f'\nHome User [matched]: {homeUser}\n')    
                     logger.debug(f'Switching to user: [{homeUser}] ...\n')
                     
                     print(f'-----------[BEGIN]-------------- {homeUser} -------------[BEGIN]--------------')
