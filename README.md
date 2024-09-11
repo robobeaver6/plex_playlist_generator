@@ -86,7 +86,7 @@ Uses either the Account Method or Server Method to generate playlist of movies a
 >
 >Note: any of the below commands can be run by either connection method (Server/Account).
 >
-The default behavior of the script for TV Shows is that if its a show a user has began watchhing the script will begin with the episode you are currently on.
+The default behavior of the script for TV Shows is that if its a show a user has began watching the script will begin with the episode you are currently on.
 
 
 ### Examples:
