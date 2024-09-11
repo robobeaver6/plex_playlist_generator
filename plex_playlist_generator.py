@@ -1128,7 +1128,7 @@ def generate_all_users_playlist_via_server_method(base_url, authToken, homeUsers
                 continue
                 
         #If none of the users entered by the user are valid
-        if (numberValidHomeUsersEntered <= 0):
+        if((args.homeusers != None) and (numberValidHomeUsersEntered <= 0)):
             print(f'\nError - No Valid Home Users Submitted.\n')
             exit(1)
 
@@ -1313,7 +1313,7 @@ def generate_all_users_playlist_via_account_method(plexConnection, accountInfo, 
                 continue
 
         #If none of the users entered by the user are valid
-        if (numberValidHomeUsersEntered <= 0):
+        if((args.homeusers != None) and (numberValidHomeUsersEntered <= 0)):
             print(f'\nError - No Valid Home Users Submitted.\n')
             exit(1)
             
