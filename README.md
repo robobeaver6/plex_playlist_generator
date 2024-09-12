@@ -51,7 +51,7 @@ Library Selection Behavior:
   --allshows             Grab All Shows in all Library sections From Plex
   --allmovies            Grab All Movies in all Library sections From Plex
   --select-library, -l   SELECT_LIBRARY   Choose between library sections of both TV Shows or Movies to build a playlist from (comma seperated within quotes if multiple users)
-  --exclude-library -e   EXCLUDE_LIBRARY  Comma seperated list (if selecting multiple users) of sections to exclude (I.E. "Test Videos,Workout,Home Videos" ) there should be no space between the comma and the first character of the next value
+  --exclude-library, -e  EXCLUDE_LIBRARY  Comma seperated list (if selecting multiple users) of sections to exclude (I.E. "Test Videos,Workout,Home Videos" ) there should be no space between the comma and the first character of the next value
   --purge                Remove a playlist from plex for the provided user(s)
 
 User Profile Selection:
