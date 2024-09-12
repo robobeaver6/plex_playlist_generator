@@ -75,8 +75,10 @@ BLACKLIST = ['Downton Abbey',
 #                    as a paramater an error would occur.                                                                                        #
 #                  - [Bug Fixes] Fixed a bug where some movies would be prevented from being added to a playlist due to an already added item    #
 #                    being attemptedly added multiple times; however, since it is already in the playlist it was not added again                 #
-#                    but still caused the playlist count to be lower than expected at times due to this.                                         #                                               #
-#                  - [Improvements] Added a check to make sure a user entered either a --adminuser argument or a --homeusers argument.           #                                                                    #
+#                    but still caused the playlist count to be lower than expected at times due to this.                                         #
+#                  - [Enhancements] Added a check to make sure a user entered either a --adminuser argument or a --homeusers argument.           #
+#                  - [Enhancements] Added the ability to purge a playlist without providing the --select-library, --allshows,                    #
+#                    or --allmovies arguments.                                                                                                   #
 ##################################################################################################################################################
 
 
@@ -1369,11 +1371,11 @@ def main():
         print(f'\nERROR - The script requires the use of at least one User.\n\nAvailable options:\n [1] - adminuser (--adminuser) \n [2] - homeusers (--homeusers "Username1,Username2,...")\n')
         exit(1)
 
-    #If the user does not pass in either of the following arguments: --selectlibrary, --allshows, or --allmovies
-    if(args.select_library == None) and (args.allshows == False) and (args.allmovies == False):
+    #If the user does not pass in either of the following arguments: --selectlibrary, --allshows, or --allmovies, or --purge
+    if(args.select_library == None) and (args.allshows == False) and (args.allmovies == False) and (args.purge == False):
         print('\nERROR - One of the required arguments must be selected.')
         print(f'        Rerun your command with one of the following required Arguments:')
-        print(f'        --selectlibrary\n        --allshows\n        --allmovies\n')
+        print(f'        --selectlibrary\n        --allshows\n        --allmovies\n        --purge\n')
         time.sleep(3)
         exit(1)
 
