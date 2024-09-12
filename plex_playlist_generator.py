@@ -1379,7 +1379,7 @@ def main():
         time.sleep(3)
         exit(1)
     #If purge argument is used, then it should not be used at the same time as the following arguments: --select-library, --allshows, or --allmovies
-    elif(args.select_library != None) or (args.allshows != False) or (args.allmovies != False) and (args.purge != False):
+    elif((args.select_library != None) or (args.allshows != False) or (args.allmovies != False)) and (args.purge != False):
         print('\nERROR - The \"--purge\" argument cannot be used in conjuction with the following arguments:')
         print(f'        --select-library\n        --allshows\n        --allmovies\n')
         time.sleep(3)
