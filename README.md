@@ -75,7 +75,7 @@ e.g. `plex_playlist_generator.py --account --username MyUserName --password Sh1t
 
 ### Server
 Uses The Server URL and Authentication Token  
-e.g. `plex_playlist_generator.py --server --baseurl "http://172.16.1.100:32400" --token "fR5GrDxfLunKynNub5" --allshows`
+e.g. `plex_playlist_generator.py --server --baseurl "http://172.16.1.100:32400" --token "fR5GrDxfLunKynNub5" --resource MyServer --allshows`
 
 ### Authentication Token
 To get your Auth token, browse to an episode in the web UI. Click on the `...` video and select `Get Info`.  In the 
@@ -94,27 +94,27 @@ The default behavior of the script for TV Shows is that if its a show a user has
 Generate 10 random unwatched TV Show episodes:  
     `plex_playlist_generator.py --server --baseurl "https://your.domain.com:32400" --token "fR5GrDxfLunKynNub5" --resource MyServer --allshows --homeusers John`
 
-Generate 10 random unwatched epsidodes for the 3 provided homeusers (Johnny,Smith,Curry): 
-    `plex_playlist_generator.py --account --username MyUserName --password Sh1tPass --resource MyServer --allshows --homeusers "John,Smith,Curry" --excludeilibrary "TV Shows,Movies"`
+Generate 10 random unwatched epsidodes for the 3 provided homeusers (Johnny,Smith,Curry), excluding shows from the library section "Animated TV Shows": 
+    `plex_playlist_generator.py --account --username MyUserName --password Sh1tPass --resource MyServer --allshows --homeusers "John,Smith,Curry" --exclude-library "Animated TV Shows"`
 
 Generate 10 random unwatched movies for the admin user:
     `plex_playlist_generator.py --server --baseurl "https://your.domain.com:32400" --token "fR5GrDxfLunKynNub5" --resource MyServer --allmovies --adminuser`
 
-Generate 5 random unwatched Movies for the 3 provided homeusers (Johnny,Smith,Curry): 
+Generate 5 random unwatched Movies for the 3 provided homeusers (Johnny,Smith,Curry), and the admin user: 
   `plex_playlist_generator.py --account --username MyUserName --password Sh1tPass --resource MyServer --allmovies --adminuser --homeusers "John,Smith,Curry" --number 5`
 
 Generate 3 random unwatched epsidodes for all home users on the plex server:
     `plex_playlist_generator.py --server --baseurl "http://172.16.1.100:32400" --token "fR5GrDxfLunKynNub5" --resource MyServer --allmovies --adminuser --homeusers all --number 3`
 
-Ignore The facty that not all episodes are available for a show in your library [highly recommend using to reduce processing time]
-    `plex_playlist_generator.py --account --username MyUserName --password Sh1tPass --resource MyServer --allmovies --adminuser --homeusers "all" --ignore-skipped`
+Ignore the fact that not all episodes are available for a show in your library (set by default to reduce processing time)
+    `plex_playlist_generator.py --account --username MyUserName --password Sh1tPass --resource MyServer --allshows --adminuser --homeusers "all" --ignore-skipped`
 
 Generate a mix 8 random shows and movies:
-    `plex_playlist_generator.py --server --baseurl "http://172.16.1.100:32400" --token "fR5GrDxfLunKynNub5" --resource MyServer --allmovies --homeusers --allshows --allmovies --number 8`
+    `plex_playlist_generator.py --server --baseurl "http://172.16.1.100:32400" --token "fR5GrDxfLunKynNub5" --resource MyServer --allmovies --allshows --homeusers John --allmovies --number 8`
 
-Generate a playlist with the name "Test1" for all home users:
-`plex_playlist_generator.py --account --username MyUserName --password Sh1tPass --resource MyServer --allmovies --adminuser --homeusers "all" --name "Test1"`
+Generate a playlist from the library section "TV Shows" with the name "Test1" for **all** home users:
+`plex_playlist_generator.py --account --username MyUserName --password Sh1tPass --resource MyServer --select-library "TV Shows" --adminuser --homeusers "all" --name "Test1"`
 
-Delete a playlist with the name "Test1" for all home users:
-    `plex_playlist_generator.py --account --username MyUserName --password Sh1tPass --resource MyServer --adminuser --homeusers "all" --purge`
+Delete a playlist with the name "Test1" for **all** home users:
+    `plex_playlist_generator.py --account --username MyUserName --password Sh1tPass --resource MyServer --adminuser --homeusers "all" --name "Test1" --purge`
 
