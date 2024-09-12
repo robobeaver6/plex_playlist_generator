@@ -67,6 +67,18 @@ BLACKLIST = ['Downton Abbey',
 #       07/28/2024 - [Improvements] Added more error checking when selecting all Home Users. Added exceptions for Bad Requests.                  #
 #                                                                                                                                                #
 #       07/31/2024 - [Bug Fixes] Fixed a bug that caused home users to not be selected in certain instances.                                     #
+#                                                                                                                                                #
+#       09/10/2024 - [Bug Fixes] Fixed a bug that resulted in a NameError when the provided users are invalid.                                   #
+#                  - [Added Feature] Resource argument is now required for server connection method (due to the switching of users).             #
+#                                                                                                                                                #
+#       09/11/2024 - [Bug Fixes] Fixed a bug that caused an error when all movies or movie selections were selected with "--include-watched"     #
+#                    as a paramater an error would occur.                                                                                        #
+#                  - [Bug Fixes] Fixed a bug where some movies would be prevented from being added to a playlist due to an already added item    #
+#                    being attemptedly added multiple times; however, since it is already in the playlist it was not added again                 #
+#                    but still caused the playlist count to be lower than expected at times due to this.                                         #
+#                  - [Enhancements] Added a check to make sure a user entered either a --adminuser argument or a --homeusers argument.           #
+#                  - [Enhancements] Added the ability to purge a playlist without providing the --select-library, --allshows,                    #
+#                    or --allmovies arguments.                                                                                                   #
 ##################################################################################################################################################
 
 
@@ -125,17 +137,23 @@ def get_random_episodes_or_movies(plex, all_provided_sections, requested_playlis
     #Used to determine whether to append to a empty library section all content, or add to concatinate an existing set of data
     count = 0
     
+
     for provided_section in all_provided_sections:
         if count == 0:
-            all_shows_or_movies_from_provided_sections = plex.library.section(provided_section).all()
-            
+            if(args.include_watched == True):
+                all_shows_or_movies_from_provided_sections = plex.library.section(provided_section).all()
+                logger.debug(f'\nall_shows_or_movies_from_provided_sections[{count}] = {all_shows_or_movies_from_provided_sections}')
+            else:
+                all_shows_or_movies_from_provided_sections = plex.library.section(provided_section).all(unwatched=True)
+                logger.debug(f'\nall_shows_or_movies_from_provided_sections[{count}] = {all_shows_or_movies_from_provided_sections}')
+                
             if getShowSectionSearcher in str(plex.library.section(provided_section)):
                 all_shows_from_provided_sections = plex.library.section(provided_section).all()
                 
             elif getMovieSectionSearcher in str(plex.library.section(provided_section)):
                 if(args.include_watched == True):
                     logger.debug(f'\nIncluding Watched Movies...\n')
-                    all_movies_from_provided_sections = plex.library.section(provided_section)
+                    all_movies_from_provided_sections = plex.library.section(provided_section).all()
                     
                 else:
                     logger.debug(f'\nExcluding Watched Movies...\n')
@@ -143,8 +161,13 @@ def get_random_episodes_or_movies(plex, all_provided_sections, requested_playlis
                 
             count += 1
         else:
-            all_shows_or_movies_from_provided_sections = all_shows_or_movies_from_provided_sections + plex.library.section(provided_section).all()
-            logger.debug(f'\nall_shows_or_movies_from_provided_sections[{count}] = {all_shows_or_movies_from_provided_sections}')
+            if(args.include_watched == True):
+                all_shows_or_movies_from_provided_sections = all_shows_or_movies_from_provided_sections + plex.library.section(provided_section).all()
+                logger.debug(f'\nall_shows_or_movies_from_provided_sections[{count}] = {all_shows_or_movies_from_provided_sections}')
+            else:
+                all_shows_or_movies_from_provided_sections = all_shows_or_movies_from_provided_sections + plex.library.section(provided_section).all(unwatched=True)
+                logger.debug(f'\nall_shows_or_movies_from_provided_sections[{count}] = {all_shows_or_movies_from_provided_sections}')
+
    
             if getShowSectionSearcher in str(plex.library.section(provided_section)):
                 all_shows_from_provided_sections = all_shows_from_provided_sections + plex.library.section(provided_section).all()
@@ -152,8 +175,9 @@ def get_random_episodes_or_movies(plex, all_provided_sections, requested_playlis
                 
             elif getMovieSectionSearcher in str(plex.library.section(provided_section)):
                 if(args.include_watched == True):
+                    #If the user did select to include watched movies with --include-watched
                     logger.debug(f'\nIncluding Watched Movies...\n')
-                    all_movies_from_provided_sections = all_movies_from_provided_sections + plex.library.section(provided_section)
+                    all_movies_from_provided_sections = all_movies_from_provided_sections + plex.library.section(provided_section).all()
                     
                 else:
                     #If the user did not select to include watched movies with --include-watched
@@ -182,7 +206,6 @@ def get_random_episodes_or_movies(plex, all_provided_sections, requested_playlis
                 logger.debug(f'GET_EPISODES: Show Blacklisted: {show.title}')
                 continue
             if args.include_watched is True:
-                #show_episodes[show.title] = show.episodes()
                 #Grab Watched Episodes but ignore Season 0 (Specials)
                 show_episodes[show.title] = show.episodes(parentIndex__gt=0)
             else:
@@ -215,7 +238,7 @@ def get_random_episodes_or_movies(plex, all_provided_sections, requested_playlis
                     
                 except IndexError as e:
                     #If the Index is out of range (this can occur if the seasons after the special seasons have all been watched).
-                    print(f'\nIndex that Procceeds \"{show.title} - {season_episode} - {episode_title}\" is out of Range :: {e}\n')
+                    print(f'\nIndex that comes after \"{show.title} - {season_episode} - {episode_title}\" is out of Range :: {e}\n')
                     break
 
 
@@ -228,10 +251,14 @@ def get_random_episodes_or_movies(plex, all_provided_sections, requested_playlis
     #Used to determine if the show or movies was empty. If not then they are valid selections for get_show_or_movie variable
     shows_available = False
     movies_available = False
+
     
     #If the playlist item count passed in by the user is larger than the total item count of the selected content then update the value of the playlist to be that of the maximum number of contents passed in to the script
     if(len(all_shows_or_movies_from_provided_sections)) < requested_playlist_items:
         requested_playlist_items = len(all_shows_or_movies_from_provided_sections)
+        
+    #Takes the initial value of the  
+    length_of_requested_playlist_items = requested_playlist_items
 
     playlist = []
     while len(playlist) < requested_playlist_items:
@@ -241,7 +268,7 @@ def get_random_episodes_or_movies(plex, all_provided_sections, requested_playlis
             shows_available = True
             
         #Using The list of Movies.
-        if (all_movies_from_provided_sections):
+        if (all_movies_from_provided_sections):                
             show_or_movie_name = random.choice(all_movies_from_provided_sections)
             movies_available = True
         
@@ -334,12 +361,21 @@ def get_random_episodes_or_movies(plex, all_provided_sections, requested_playlis
                 #If the user selects to include watched movies
                 logger.debug(f'\nIncluding Watched Movies...\n')
                 movie = random.choice(all_movies_from_provided_sections)
+                
+                #Check if the Movie is already in the list, if it is continue
+                if (movie in playlist) and (len(playlist) < requested_playlist_items):
+                    continue
 
             else:
                 #If the user did not select to include watched movies with --include-watched
-                logger.debug(f'\nExcluding Unwatched Movies...\n')
+                logger.debug(f'\nExcluding Watched Movies...\n')
                 movie = random.choice(all_movies_from_provided_sections)
 
+                #Check if the Movie is already in the list, if it is continue
+                if (movie in playlist) and (len(playlist) < requested_playlist_items):
+                    continue
+
+            #Append unique movies
             playlist.append(movie)
     return playlist
 
@@ -415,7 +451,7 @@ def delete_playlist(plex, account, playlistName):
 #Arguments are the plex connection, the name of the user we are acting as for playlist generation, the formatted plex library sections, and the Excluded List of Library Sections
 def build_playlist(plex, userName, plex_refined_library_sections, selectionsToExclude_List):  
     #The plex_refined_library_sections is the library sections after removing the excluded list
-    #The librarySelection is the selected library that was passed in whether from using --allshows, --allmovies, or --selectlibrary
+    #The librarySelection is the selected library that was passed in whether from using --allshows, --allmovies, or --select-library
 
     #number of Media items added to the library.
     libraryCount = 0 
@@ -430,7 +466,7 @@ def build_playlist(plex, userName, plex_refined_library_sections, selectionsToEx
         exit(1)
 
 
-    #If the user selected libraries with the --selectlibrary argument
+    #If the user selected libraries with the --select-library argument
     if(args.select_library != None):
         randomSelectedLibrary = random.choice(plex_refined_library_sections)
     else:
@@ -486,7 +522,8 @@ def build_playlist(plex, userName, plex_refined_library_sections, selectionsToEx
                     selectionsToExclude_List = list(filter(None, selectionsToExclude_List))
                     print(f'\nExcluded Library Sections: {selectionsToExclude_List}')
         
-                season_episode = episode_movie.seasonEpisode      
+                season_episode = episode_movie.seasonEpisode
+                logger.debug(f'\n\nEpisode [label] = {(episode_movie.TYPE)}\n\n')
                 print(f'\nAdded to Playlist [{args.name}]: \"{episode_movie.grandparentTitle} - {episode_movie.parentTitle} - '
                       f'Ep.0{episode_movie.index} - {episode_movie.title}\"')
                   
@@ -509,6 +546,7 @@ def build_playlist(plex, userName, plex_refined_library_sections, selectionsToEx
                     selectionsToExclude_List = list(filter(None, selectionsToExclude_List))
                     print(f'\nExcluded Library Sections: {selectionsToExclude_List}')
 
+                logger.debug(f'\n\nMovie [label] = {(episode_movie.TYPE)}\n\n')
                 print(f'\nAdded to Playlist [{args.name}]: \"{episode_movie.title}\"')
                 
                 libraryCount += 1
@@ -557,8 +595,7 @@ def build_playlist(plex, userName, plex_refined_library_sections, selectionsToEx
                     selectionsToExclude_List = list(filter(None, selectionsToExclude_List))
                     print(f'\nExcluded Library Sections: {selectionsToExclude_List}')
         
-                logger.debug(f'\n\nepisode [label] = {(episode_movie.TYPE)}\n\n')
-                #print(f'\nplexMovieType = {plexMovieType}\n')
+                logger.debug(f'\n\nEpisode [label] = {(episode_movie.TYPE)}\n\n')
                 season_episode = episode_movie.seasonEpisode      
                 print(f'\nAdded to Playlist [{args.name}]: \"{episode_movie.grandparentTitle} - {episode_movie.parentTitle} - '
                       f'Ep.0{episode_movie.index} - {episode_movie.title}\"')
@@ -569,9 +606,7 @@ def build_playlist(plex, userName, plex_refined_library_sections, selectionsToEx
            
     #For Movies Only      
     elif (args.allshows == False) and (args.allmovies == True):
-        #movies = get_random_movies(all_Shows_or_Movies_Library_Selection, n=1)
         episode_or_movie = get_random_episodes_or_movies(plex, plex_refined_library_sections, args.number)
-        
         
         try:
             #If a playlist with the same name already exist, delete it
@@ -591,16 +626,17 @@ def build_playlist(plex, userName, plex_refined_library_sections, selectionsToEx
         if(not createdPlaylist):
             print(f'Error - Unable to generate the Playlist \"{args.name}\"')
             exit(1)
+
         
         #Print the Episode added to the playlist
         for episode_movie in episode_or_movie:
-            #If the media type is show then print the output for the show details
-            if episode_movie.TYPE in getShow:
+            #If the media type is movie then print the output for the movie details
+            if episode_movie.TYPE in getMovie:
                 print('\n-----------------------------------')
-                print('[RANDOMIZED EPISODES]')
+                print('[RANDOMIZED MOVIES]')
                 print(f'Username: {userName}')
-                print(f'Library Selection: {episode_movie.librarySectionTitle}')  
-
+                print(f'Library Selection: {episode_movie.librarySectionTitle}')
+                
                 #If no library sections are to be excluded print None for the excluded Library sections
                 if (not selectionsToExclude_List) or (args.exclude_library == ''):
                     print(f'\nExcluded Library Sections: None')
@@ -609,20 +645,18 @@ def build_playlist(plex, userName, plex_refined_library_sections, selectionsToEx
                     #Remove Empty strings from the list
                     selectionsToExclude_List = list(filter(None, selectionsToExclude_List))
                     print(f'\nExcluded Library Sections: {selectionsToExclude_List}')
-        
-                logger.debug(f'\n\nepisode [label] = {(episode_movie.TYPE)}\n\n')
-                season_episode = episode_movie.seasonEpisode      
-                print(f'\nAdded to Playlist [{args.name}]: \"{episode_movie.grandparentTitle} - {episode_movie.parentTitle} - '
-                      f'Ep.0{episode_movie.index} - {episode_movie.title}\"')
-                  
+
+                logger.debug(f'\n\nMovie [label] = {(episode_movie.TYPE)}\n\n')
+                print(f'\nAdded to Playlist [{args.name}]: \"{episode_movie.title}\"')
+                
                 libraryCount += 1
                 print(f'Number of Items in Playlist: {libraryCount}\n')
 
 
 
 def create_playlist(plex, account):
-    #Group All Shows in different Library Sections together (does not include exclluded)
-    #Group All Movies in different Library Sections together  (does not include exclluded)
+    #Group All Shows in different Library Sections together (does not include excluded)
+    #Group All Movies in different Library Sections together  (does not include excluded)
 
     #If the user passed something into the argument selectlibrary to select their desired libraries
     if(args.select_library != None):
@@ -646,7 +680,6 @@ def create_playlist(plex, account):
         allSections_List.append(section.title)
     
     #for the section in allSections (converted to String):
-    #allSections_String = str(getAllSections)
     allShowSections_String = str()
     allMovieSections_String = str()
     
@@ -671,7 +704,6 @@ def create_playlist(plex, account):
         
     #If the user did NOT Select The library selection, default plex_all_tv_and_movie_library_sections_minus_exluded to a Default of the full list of sections in order to remove from the list anything that is in the excluded list
     else:
-        #plex_all_tv_and_movie_library_sections_minus_exluded = allSections_List
         plex_all_tv_and_movie_library_sections_minus_exluded = list()
         
         #Used to build a list of everything that was excluded 
@@ -796,7 +828,7 @@ def create_playlist(plex, account):
             if not foundMatchInExclude and not foundMatchInUSerSelection:
                 logger.debug(f'Adding library \"{library}\" to List of selectionsToExcludeBasedOnWhatUserSelected_List')
 
-                #Add the library to the Full list of what was excluded library sections for everything that is not in --selectlibrary argument passed in by the user
+                #Add the library to the Full list of what was excluded library sections for everything that is not in --select-library argument passed in by the user
                 selectionsToExcludeBasedOnWhatUserSelected_List.append(library)
                 
             # #if library is one of the selected sections requested by the user, add it.
@@ -808,7 +840,7 @@ def create_playlist(plex, account):
             else:
                 logger.debug(f'Adding library \"{library}\" to List of selectionsToExcludeBasedOnWhatUserSelected_List')
                 
-                #Add the library to the Full list of what was excluded library sections for everything that is not in --selectlibrary argument passed in by the user
+                #Add the library to the Full list of what was excluded library sections for everything that is not in --select-library argument passed in by the user
                 selectionsToExcludeBasedOnWhatUserSelected_List.append(library)
 
         else:
@@ -1080,13 +1112,16 @@ def generate_all_users_playlist_via_server_method(base_url, authToken, homeUsers
                 print(f'\nError - BadRequest: {e}\n')
                 exit(1)
                 
-    else:                
-        for homeUser in homeUsers:        
-            if homeUser in plex_users:
+    else:
+        #Used to count the number of valid Home Users entered by the user.
+        numberValidHomeUsersEntered = 0
+        
+        for homeUser in homeUsers:
+            if homeUser in allHomeUsers:
                 try:
                     #if plex_user in homeUsers: 
                     logger.debug('\nChecking if the user is a Plex Home guest...\n')
-                    logger.debug(f'\nHome User [matched]: {str(homeUser)}\n')    
+                    logger.debug(f'\nHome User [matched]: {homeUser}\n')      
                     logger.debug(f'Switching to user: [{homeUser}] ...\n')
                     
                     print(f'-----------[BEGIN]-------------- {homeUser} -------------[BEGIN]--------------')
@@ -1097,16 +1132,23 @@ def generate_all_users_playlist_via_server_method(base_url, authToken, homeUsers
 
                     #If the --purge argument was passed in then delete the playlist if it exist
                     if(args.purge == True):
-                        delete_playlist(runningAsUser, homeUser, args.name) 
+                        delete_playlist(runningAsUser, homeUser, args.name)
+                        
+                        #Increment the valid entered user count
+                        numberValidHomeUsersEntered += 1
                     else:
                         print(f'Creating playlist \"{args.name}\" ...')
                         create_playlist(runningAsUser, homeUser)
-                        print(f'\nPlaylist creation for user [{homeUser}] - COMPLETED\n')                        
+                        print(f'\nPlaylist creation for user [{homeUser}] - COMPLETED\n')
+                        
+                        #Increment the valid entered user count
+                        numberValidHomeUsersEntered += 1
                     print(f'------------[END]------------- {homeUser} --------------[END]-------------')  
                     
                     if(args.purge != None):
                         time.sleep(5)
                         
+                                            
                 except Unauthorized:
                     print(f'User \"{homeUser}\" is Unauthorized to access the Plex Home \"{args.resource}\"')
 
@@ -1119,6 +1161,11 @@ def generate_all_users_playlist_via_server_method(base_url, authToken, homeUsers
                     
             else:
                 continue
+                
+        #If none of the users entered by the user are valid
+        if((args.homeusers != None) and (numberValidHomeUsersEntered <= 0)):
+            print(f'\nError - No Valid Home Users Submitted.\n')
+            exit(1)
 
 
 def generate_all_users_playlist_via_account_method(plexConnection, accountInfo, homeUsers):
@@ -1251,13 +1298,16 @@ def generate_all_users_playlist_via_account_method(plexConnection, accountInfo, 
                 print(f'\nError - BadRequest: {e}\n')
                 exit(1)
                 
-    else:                
+    else:
+        #Used to count the number of valid Home Users entered by the user.
+        numberValidHomeUsersEntered = 0
+        
         for homeUser in homeUsers:        
             if homeUser in allHomeUsers:
                 try:
                     #if plex_user in homeUsers: 
                     logger.debug('\nChecking if the user is a Plex Home guest...\n')
-                    logger.debug(f'\nHome User [matched]: {str(homeUser)}\n')    
+                    logger.debug(f'\nHome User [matched]: {homeUser}\n')    
                     logger.debug(f'Switching to user: [{homeUser}] ...\n')
                     
                     print(f'-----------[BEGIN]-------------- {homeUser} -------------[BEGIN]--------------')
@@ -1268,11 +1318,17 @@ def generate_all_users_playlist_via_account_method(plexConnection, accountInfo, 
 
                     #If the --purge argument was passed in then delete the playlist if it exist
                     if(args.purge == True):
-                        delete_playlist(runningAsUser, homeUser, args.name) 
+                        delete_playlist(runningAsUser, homeUser, args.name)
+
+                        #Increment the valid entered user count
+                        numberValidHomeUsersEntered += 1                        
                     else:
                         print(f'Creating playlist \"{args.name}\" ...')
                         create_playlist(runningAsUser, homeUser)
-                        print(f'\nPlaylist creation for user [{homeUser}] - COMPLETED\n')                        
+                        print(f'\nPlaylist creation for user [{homeUser}] - COMPLETED\n')
+                        
+                        #Increment the valid entered user count
+                        numberValidHomeUsersEntered += 1                        
                     print(f'------------[END]------------- {homeUser} --------------[END]-------------')  
                     
                     if(args.purge != None):
@@ -1291,6 +1347,11 @@ def generate_all_users_playlist_via_account_method(plexConnection, accountInfo, 
             else:
                 continue
 
+        #If none of the users entered by the user are valid
+        if((args.homeusers != None) and (numberValidHomeUsersEntered <= 0)):
+            print(f'\nError - No Valid Home Users Submitted.\n')
+            exit(1)
+            
 
 def main():
     global args
@@ -1299,17 +1360,28 @@ def main():
 
     #If the user enters the selectLibrary argument
     if(args.select_library != None) and (args.allshows == True):
-        print(f'\nERROR - The \"selectLibrary\" argument cannot be used in conjunction with the \"allShows\" argument.\n')
+        print(f'\nERROR - The \"--select-library\" argument cannot be used in conjunction with the \"--allShows\" argument.\n')
         exit(1)
     elif(args.select_library != None) and (args.allmovies == True):
-        print(f'\nERROR - The \"selectLibrary\" argument cannot be used in conjunction with the \"allmovies\" argument.\n')
+        print(f'\nERROR - The \"--select-library\" argument cannot be used in conjunction with the \"--allmovies\" argument.\n')
+        exit(1)
+    
+    #If the user does not provide a user to apply the playlist creation/deletion to, print an Error, and exit.
+    if(args.adminuser != True) and (args.homeusers == None):
+        print(f'\nERROR - The script requires the use of at least one User.\n\nAvailable options:\n [1] - adminuser (--adminuser) \n [2] - homeusers (--homeusers "Username1,Username2,...")\n')
         exit(1)
 
-    #If the user does not pass in either of the following arguments: --selectlibrary, --allshows, or --allmovies
-    if(args.select_library == None) and (args.allshows == False) and (args.allmovies == False):
+    #If the user does not pass in either of the following arguments: --select-library, --allshows, --allmovies, or --purge
+    if(args.select_library == None) and (args.allshows == False) and (args.allmovies == False) and (args.purge == False):
         print('\nERROR - One of the required arguments must be selected.')
         print(f'        Rerun your command with one of the following required Arguments:')
-        print(f'        --selectlibrary\n        --allshows\n        --allmovies\n')
+        print(f'        --select-library\n        --allshows\n        --allmovies\n        --purge\n')
+        time.sleep(3)
+        exit(1)
+    #If purge argument is used, then it should not be used at the same time as the following arguments: --select-library, --allshows, or --allmovies
+    elif((args.select_library != None) or (args.allshows != False) or (args.allmovies != False)) and (args.purge != False):
+        print('\nERROR - The \"--purge\" argument cannot be used in conjuction with the following arguments:')
+        print(f'        --select-library\n        --allshows\n        --allmovies\n')
         time.sleep(3)
         exit(1)
 
@@ -1362,7 +1434,7 @@ def main():
         if args.debug:
             logger.setLevel(logging.DEBUG)
             
-        #If the authorization method is Server
+        #If the authorization method is Account
         if (args.account == True) and (args.server == False):
         
             #If the username argument is empty or missing
@@ -1415,6 +1487,11 @@ def main():
                 print(f'\nThe Auth Token is required and cannot be empty.\n')
                 exit(1)
 
+            #If the resource argument is empty or missing
+            if(args.resource == None) or (args.resource == ""):
+                print(f'\nThe argument \"--resource\" is required for the server connection method, and cannot be empty.\n')
+                exit(1)
+
             #Connect via Direct URL
             #Generate Playlist for the requested Server (Method) Users
             if (args.homeusers != False):
@@ -1423,7 +1500,7 @@ def main():
                 generate_all_users_playlist_via_server_method(args.baseurl, args.token)
             
         else:
-            #print That the connection method is required to proceed.
+            #Print that the connection method is required to proceed.
             print(f'\nERROR - The script requires the use of ONE connection method to proceed.\n\nAvailable options:\n [1] - account (--account) \n [2] - server (--server)\n')
             exit(1)
             
