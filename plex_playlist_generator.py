@@ -76,6 +76,7 @@ BLACKLIST = ['Downton Abbey',
 #                  - [Bug Fixes] Fixed a bug where some movies would be prevented from being added to a playlist due to an already added item    #
 #                    being attemptedly added multiple times; however, since it is already in the playlist it was not added again                 #
 #                    but still caused the playlist count to be lower than expected at times due to this.                                         #                                               #
+#                  - [Improvements] Added a check to make sure a user entered either a --adminuser argument or a --homeusers argument.           #                                                                    #
 ##################################################################################################################################################
 
 
@@ -1362,6 +1363,11 @@ def main():
     elif(args.select_library != None) and (args.allmovies == True):
         print(f'\nERROR - The \"selectLibrary\" argument cannot be used in conjunction with the \"allmovies\" argument.\n')
         exit(1)
+    
+    #If the user does not provide a user to apply the playlist creation/deletion to, print an Error, and exit.
+    if(args.adminuser != True) and (args.homeusers == None):
+        print(f'\nERROR - The script requires the use of at least one User.\n\nAvailable options:\n [1] - adminuser (--adminuser) \n [2] - homeusers (--homeusers "Username1,Username2,...")\n')
+        exit(1)
 
     #If the user does not pass in either of the following arguments: --selectlibrary, --allshows, or --allmovies
     if(args.select_library == None) and (args.allshows == False) and (args.allmovies == False):
@@ -1486,7 +1492,7 @@ def main():
                 generate_all_users_playlist_via_server_method(args.baseurl, args.token)
             
         else:
-            #print That the connection method is required to proceed.
+            #Print that the connection method is required to proceed.
             print(f'\nERROR - The script requires the use of ONE connection method to proceed.\n\nAvailable options:\n [1] - account (--account) \n [2] - server (--server)\n')
             exit(1)
             
