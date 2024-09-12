@@ -238,7 +238,7 @@ def get_random_episodes_or_movies(plex, all_provided_sections, requested_playlis
                     
                 except IndexError as e:
                     #If the Index is out of range (this can occur if the seasons after the special seasons have all been watched).
-                    print(f'\nIndex that Procceeds \"{show.title} - {season_episode} - {episode_title}\" is out of Range :: {e}\n')
+                    print(f'\nIndex that comes after \"{show.title} - {season_episode} - {episode_title}\" is out of Range :: {e}\n')
                     break
 
 
@@ -451,7 +451,7 @@ def delete_playlist(plex, account, playlistName):
 #Arguments are the plex connection, the name of the user we are acting as for playlist generation, the formatted plex library sections, and the Excluded List of Library Sections
 def build_playlist(plex, userName, plex_refined_library_sections, selectionsToExclude_List):  
     #The plex_refined_library_sections is the library sections after removing the excluded list
-    #The librarySelection is the selected library that was passed in whether from using --allshows, --allmovies, or --selectlibrary
+    #The librarySelection is the selected library that was passed in whether from using --allshows, --allmovies, or --select-library
 
     #number of Media items added to the library.
     libraryCount = 0 
@@ -466,7 +466,7 @@ def build_playlist(plex, userName, plex_refined_library_sections, selectionsToEx
         exit(1)
 
 
-    #If the user selected libraries with the --selectlibrary argument
+    #If the user selected libraries with the --select-library argument
     if(args.select_library != None):
         randomSelectedLibrary = random.choice(plex_refined_library_sections)
     else:
@@ -828,7 +828,7 @@ def create_playlist(plex, account):
             if not foundMatchInExclude and not foundMatchInUSerSelection:
                 logger.debug(f'Adding library \"{library}\" to List of selectionsToExcludeBasedOnWhatUserSelected_List')
 
-                #Add the library to the Full list of what was excluded library sections for everything that is not in --selectlibrary argument passed in by the user
+                #Add the library to the Full list of what was excluded library sections for everything that is not in --select-library argument passed in by the user
                 selectionsToExcludeBasedOnWhatUserSelected_List.append(library)
                 
             # #if library is one of the selected sections requested by the user, add it.
@@ -840,7 +840,7 @@ def create_playlist(plex, account):
             else:
                 logger.debug(f'Adding library \"{library}\" to List of selectionsToExcludeBasedOnWhatUserSelected_List')
                 
-                #Add the library to the Full list of what was excluded library sections for everything that is not in --selectlibrary argument passed in by the user
+                #Add the library to the Full list of what was excluded library sections for everything that is not in --select-library argument passed in by the user
                 selectionsToExcludeBasedOnWhatUserSelected_List.append(library)
 
         else:
@@ -1360,10 +1360,10 @@ def main():
 
     #If the user enters the selectLibrary argument
     if(args.select_library != None) and (args.allshows == True):
-        print(f'\nERROR - The \"selectLibrary\" argument cannot be used in conjunction with the \"allShows\" argument.\n')
+        print(f'\nERROR - The \"--select-library\" argument cannot be used in conjunction with the \"--allShows\" argument.\n')
         exit(1)
     elif(args.select_library != None) and (args.allmovies == True):
-        print(f'\nERROR - The \"selectLibrary\" argument cannot be used in conjunction with the \"allmovies\" argument.\n')
+        print(f'\nERROR - The \"--select-library\" argument cannot be used in conjunction with the \"--allmovies\" argument.\n')
         exit(1)
     
     #If the user does not provide a user to apply the playlist creation/deletion to, print an Error, and exit.
@@ -1371,11 +1371,17 @@ def main():
         print(f'\nERROR - The script requires the use of at least one User.\n\nAvailable options:\n [1] - adminuser (--adminuser) \n [2] - homeusers (--homeusers "Username1,Username2,...")\n')
         exit(1)
 
-    #If the user does not pass in either of the following arguments: --selectlibrary, --allshows, or --allmovies, or --purge
+    #If the user does not pass in either of the following arguments: --select-library, --allshows, --allmovies, or --purge
     if(args.select_library == None) and (args.allshows == False) and (args.allmovies == False) and (args.purge == False):
         print('\nERROR - One of the required arguments must be selected.')
         print(f'        Rerun your command with one of the following required Arguments:')
-        print(f'        --selectlibrary\n        --allshows\n        --allmovies\n        --purge\n')
+        print(f'        --select-library\n        --allshows\n        --allmovies\n        --purge\n')
+        time.sleep(3)
+        exit(1)
+    #If purge argument is used, then it should not be used at the same time as the following arguments: --select-library, --allshows, or --allmovies
+    elif(args.select_library != None) or (args.allshows != False) or (args.allmovies != False) and (args.purge != False):
+        print('\nERROR - The \"--purge\" argument cannot be used in conjuction with the following arguments:')
+        print(f'        --select-library\n        --allshows\n        --allmovies\n')
         time.sleep(3)
         exit(1)
 
