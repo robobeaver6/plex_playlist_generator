@@ -79,6 +79,10 @@ BLACKLIST = ['Downton Abbey',
 #                  - [Enhancements] Added a check to make sure a user entered either a --adminuser argument or a --homeusers argument.           #
 #                  - [Enhancements] Added the ability to purge a playlist without providing the --select-library, --allshows,                    #
 #                    or --allmovies arguments.                                                                                                   #
+#                                                                                                                                                #
+#       12/07/2024 - [Enhancement] Added the ability to Filter and grab Shows/Movies from a specific Collection for the given libraries.         #
+#                    The playlist will only contain the provided Collections (I.E. --collections "Christmas Themed") from each library given.    #
+#                  - [Enhancement] Added the option to skip the printout of the generated playlist using --skip-printout.                        #
 ##################################################################################################################################################
 
 
@@ -89,6 +93,8 @@ def get_args():
     parser.add_argument('--name', help='Playlist Name', default='[Auto-Generated]')
     parser.add_argument('--number', '-n', help='Number of episodes or Movies to add to play list', type=int, default=10)
     parser.add_argument('--debug', '-d', help='Debug Logging', action="store_true")
+    #Use --skip-printout to not print out the output of the generated playlist (this will save time running thge scipt since it will not have to take time printing the contents to the screen). 
+    parser.add_argument('--skip-printout', action='store_true', help='Skip printing the output to the console (will decrease runtime).', default=False)
     group_server = parser.add_argument_group('Server Connection Method')
     group_server.add_argument('--server', action='store_true', help='Server connection Method')
     group_server.add_argument('--baseurl', '-b', help='Base URL of Server (I.E \"http://10.1.1.8:32400\" or \"https://your.domain.com:32400\")', type=str, default="http://localhost:32400")
@@ -110,6 +116,11 @@ def get_args():
     #The Exclude data will be used in conjuction with either --allshows or --allmovies
     group_libraries.add_argument('--exclude-library', '-e', help='Comma seperated list (if selecting multiple users) of sections to exclude (I.E. "Test Videos,Workout,Home Videos" ) there should be no space between the comma and the first character of the next value', type=str, default="")
     group_libraries.add_argument('--purge', help='Remove a playlist from plex for the provided user(s)', action='store_true', default=False)  
+    #The Tags group will be used to obtain Tags (I.E. Collections), and will be used to further filter from the provided selections, and only grab selections whose Collections Tag includes 
+    group_tags = parser.add_argument_group('Collections Tag Filter')    
+    #Filters out anything whose not a part of the provided Plex Collection for each library that the user selects.
+    # Added the option '--collection' which takes an argument of a Collection Name, in order to only grab items from the specified collection by name in order to add them to the playlist generation. The collection name provided will be used to query through each associated library, filtering and grabbing items who are part of a collection with the same name to add them to the playlist.
+    group_tags.add_argument('--collection', '-c', help='Retrieve\'s items that are part of a Collection matching the name provided to \'--collection\', and will be applied to each library that the user selected.')
     group_users = parser.add_argument_group('User Profile Selection')    
     #Used for Entering the Admin user(s) 
     group_users.add_argument('--adminuser', '-a', help='Generate playlist for the Plex Admin user profile name that was used to login.', action='store_true', default=False)
@@ -137,52 +148,132 @@ def get_random_episodes_or_movies(plex, all_provided_sections, requested_playlis
     #Used to determine whether to append to a empty library section all content, or add to concatinate an existing set of data
     count = 0
     
+    #The Location of where the season should begin beyond (greater than)
+    startSeasonFrom = 0
+    
+    #Library Type (Used to request episodes in search from the API)
+    getEpisode = 'episode'
+    
+    #Used to find unwatched episodes
+    unwatched = 0
+    
 
     for provided_section in all_provided_sections:
         if count == 0:
             if(args.include_watched == True):
-                all_shows_or_movies_from_provided_sections = plex.library.section(provided_section).all()
-                logger.debug(f'\nall_shows_or_movies_from_provided_sections[{count}] = {all_shows_or_movies_from_provided_sections}')
+                if getMovieSectionSearcher in str(plex.library.section(provided_section)):
+                    #If args.collection is provided then only find matching collecton items within the associated library (I.E. Collections found in [Edit > Tags > Collections] within the Web interface)
+                    if(args.collection != None):
+                        all_shows_or_movies_from_provided_sections = plex.library.section(provided_section).search(collection=args.collection)
+                        logger.debug(f'\nall_shows_or_movies_from_provided_sections[{count}] -- including only items containing collection \"{args.collection}\" = {all_shows_or_movies_from_provided_sections}')
+                    else:
+                        all_shows_or_movies_from_provided_sections = plex.library.section(provided_section).all()
+                        #all_shows_or_movies_from_provided_sections = plex.library.section(provided_section).search(libtype='episode')
+                        logger.debug(f'\nall_shows_or_movies_from_provided_sections[{count}] = {all_shows_or_movies_from_provided_sections}')
+                elif getShowSectionSearcher in str(plex.library.section(provided_section)):
+                    #If args.collection is provided then only find matching collecton items within the associated library (I.E. Collections found in [Edit > Tags > Collections] within the Web interface)
+                    if(args.collection != None):
+                        all_shows_or_movies_from_provided_sections = plex.library.section(provided_section).search(collection=args.collection)
+                        logger.debug(f'\nall_shows_or_movies_from_provided_sections[{count}] -- including only items containing collection \"{args.collection}\" = {all_shows_or_movies_from_provided_sections}')
+                    else:
+                        all_shows_or_movies_from_provided_sections = plex.library.section(provided_section).all()
+                        logger.debug(f'\nall_shows_or_movies_from_provided_sections[{count}] = {all_shows_or_movies_from_provided_sections}')
             else:
-                all_shows_or_movies_from_provided_sections = plex.library.section(provided_section).all(unwatched=True)
-                logger.debug(f'\nall_shows_or_movies_from_provided_sections[{count}] = {all_shows_or_movies_from_provided_sections}')
+                #If args.collection is provided then only find matching collecton items within the associated library (I.E. Collections found in [Edit > Tags > Collections] within the Web interface)
+                if(args.collection != None):
+                    all_shows_or_movies_from_provided_sections = plex.library.section(provided_section).search(collection=args.collection, unwatched=True)
+                    logger.debug(f'\nall_shows_or_movies_from_provided_sections[{count}] -- including only items containing collection \"{args.collection}\" = {all_shows_or_movies_from_provided_sections}')
+                else:
+                    all_shows_or_movies_from_provided_sections = plex.library.section(provided_section).all(unwatched=True)
+                    logger.debug(f'\nall_shows_or_movies_from_provided_sections[{count}] = {all_shows_or_movies_from_provided_sections}')
                 
             if getShowSectionSearcher in str(plex.library.section(provided_section)):
-                all_shows_from_provided_sections = plex.library.section(provided_section).all()
+                #If args.collection is provided then only find matching collecton items within the associated library (I.E. Collections found in [Edit > Tags > Collections] within the Web interface)
+                if(args.collection != None):
+                    all_shows_from_provided_sections = plex.library.section(provided_section).search(collection=args.collection)
+                    logger.debug(f'\nall_shows_from_provided_sections[{count}] -- including only items containing collection \"{args.collection}\" = {all_shows_from_provided_sections}')
+                else:
+                    all_shows_from_provided_sections = plex.library.section(provided_section).all()
+                    logger.debug(f'\nall_shows_from_provided_sections[{count}] = {all_shows_from_provided_sections}')
                 
             elif getMovieSectionSearcher in str(plex.library.section(provided_section)):
                 if(args.include_watched == True):
-                    logger.debug(f'\nIncluding Watched Movies...\n')
-                    all_movies_from_provided_sections = plex.library.section(provided_section).all()
-                    
+                    #If args.collection is provided then only find matching collecton items within the associated library (I.E. Collections found in [Edit > Tags > Collections] within the Web interface)
+                    if(args.collection != None):
+                        logger.debug(f'\nIncluding Watched Movies...\n')
+                        all_movies_from_provided_sections = plex.library.section(provided_section).search(collection=args.collection)
+                        logger.debug(f'\nall_movies_from_provided_sections[{count}] -- including only items containing collection \"{args.collection}\" = {all_movies_from_provided_sections}')
+                    else:
+                        logger.debug(f'\nIncluding Watched Movies...\n')
+                        all_movies_from_provided_sections = plex.library.section(provided_section).all()
+                        logger.debug(f'\nall_movies_from_provided_sections[{count}] = {all_movies_from_provided_sections}')
                 else:
-                    logger.debug(f'\nExcluding Watched Movies...\n')
-                    all_movies_from_provided_sections = plex.library.section(provided_section).all(unwatched=True)
+                    #If args.collection is provided then only find matching collecton items within the associated library (I.E. Collections found in [Edit > Tags > Collections] within the Web interface)
+                    if(args.collection != None):
+                        logger.debug(f'\nExcluding Watched Movies...\n')
+                        all_movies_from_provided_sections = plex.library.section(provided_section).search(collection=args.collection, unwatched=True)
+                        logger.debug(f'\nall_movies_from_provided_sections[{count}] -- including only items containing collection \"{args.collection}\" = {all_movies_from_provided_sections}')
+                    else:
+                        logger.debug(f'\nExcluding Watched Movies...\n')
+                        all_movies_from_provided_sections = plex.library.section(provided_section).all(unwatched=True)
+                        logger.debug(f'\nall_movies_from_provided_sections[{count}] = {all_movies_from_provided_sections}')
                 
             count += 1
         else:
             if(args.include_watched == True):
-                all_shows_or_movies_from_provided_sections = all_shows_or_movies_from_provided_sections + plex.library.section(provided_section).all()
-                logger.debug(f'\nall_shows_or_movies_from_provided_sections[{count}] = {all_shows_or_movies_from_provided_sections}')
+                #If args.collection is provided then only find matching collecton items within the associated library (I.E. Collections found in [Edit > Tags > Collections] within the Web interface)
+                if(args.collection != None):
+                    all_shows_or_movies_from_provided_sections = all_shows_or_movies_from_provided_sections + plex.library.section(provided_section).search(collection=args.collection)
+                    logger.debug(f'\nall_shows_or_movies_from_provided_sections[{count}] -- including only items containing collection \"{args.collection}\" = {all_shows_or_movies_from_provided_sections}')
+                else:
+                    all_shows_or_movies_from_provided_sections = all_shows_or_movies_from_provided_sections + plex.library.section(provided_section).all()
+                    logger.debug(f'\nall_shows_or_movies_from_provided_sections[{count}] = {all_shows_or_movies_from_provided_sections}')
             else:
-                all_shows_or_movies_from_provided_sections = all_shows_or_movies_from_provided_sections + plex.library.section(provided_section).all(unwatched=True)
-                logger.debug(f'\nall_shows_or_movies_from_provided_sections[{count}] = {all_shows_or_movies_from_provided_sections}')
+                #If args.collection is provided then only find matching collecton items within the associated library (I.E. Collections found in [Edit > Tags > Collections] within the Web interface)
+                if(args.collection != None):
+                    logger.debug(f'\nExcluding Watched Shows...\n')
+                    all_shows_or_movies_from_provided_sections = all_shows_or_movies_from_provided_sections + plex.library.section(provided_section).search(collection=args.collection, unwatched=True)
+                    logger.debug(f'\nall_shows_or_movies_from_provided_sections[{count}] -- including only items containing collection \"{args.collection}\" = {all_shows_or_movies_from_provided_sections}')
+                else:
+                    logger.debug(f'\nExcluding Watched Shows...\n')
+                    all_shows_or_movies_from_provided_sections = all_shows_or_movies_from_provided_sections + plex.library.section(provided_section).all(unwatched=True)
+                    logger.debug(f'\nall_shows_or_movies_from_provided_sections[{count}] = {all_shows_or_movies_from_provided_sections}')
 
    
             if getShowSectionSearcher in str(plex.library.section(provided_section)):
-                all_shows_from_provided_sections = all_shows_from_provided_sections + plex.library.section(provided_section).all()
-                logger.debug(f'\nall_shows_from_provided_sections = {all_shows_from_provided_sections}')
+                #If args.collection is provided then only find matching collecton items within the associated library (I.E. Collections found in [Edit > Tags > Collections] within the Web interface)
+                if(args.collection != None):
+                    all_shows_from_provided_sections = all_shows_from_provided_sections + plex.library.section(provided_section).search(collection=args.collection)
+                    logger.debug(f'\nall_shows_from_provided_sections -- including only items containing collection \"{args.collection}\" = {all_shows_from_provided_sections}')
+                else:
+                    all_shows_from_provided_sections = all_shows_from_provided_sections + plex.library.section(provided_section).all()
+                    logger.debug(f'\nall_shows_from_provided_sections -- including only items containing collection \"{args.collection}\" = {all_shows_from_provided_sections}')
                 
             elif getMovieSectionSearcher in str(plex.library.section(provided_section)):
                 if(args.include_watched == True):
-                    #If the user did select to include watched movies with --include-watched
-                    logger.debug(f'\nIncluding Watched Movies...\n')
-                    all_movies_from_provided_sections = all_movies_from_provided_sections + plex.library.section(provided_section).all()
-                    
+                    #If args.collection is provided then only find matching collecton items within the associated library (I.E. Collections found in [Edit > Tags > Collections] within the Web interface)
+                    if(args.collection != None):
+                        #If the user did select to include watched movies with --include-watched
+                        logger.debug(f'\nIncluding Watched Movies...\n')
+                        all_movies_from_provided_sections = all_movies_from_provided_sections + plex.library.section(provided_section).search(collection=args.collection)
+                        logger.debug(f'\nall_movies_from_provided_sections -- including only items containing collection \"{args.collection}\" = {all_movies_from_provided_sections}')
+                    else:
+                        #If the user did select to include watched movies with --include-watched
+                        logger.debug(f'\nIncluding Watched Movies...\n')
+                        all_movies_from_provided_sections = all_movies_from_provided_sections + plex.library.section(provided_section).all()
+                   
                 else:
-                    #If the user did not select to include watched movies with --include-watched
-                    logger.debug(f'\nExcluding Watched Movies...\n')
-                    all_movies_from_provided_sections = all_movies_from_provided_sections + plex.library.section(provided_section).all(unwatched=True)
+                    #If args.collection is provided then only find matching collecton items within the associated library (I.E. Collections found in [Edit > Tags > Collections] within the Web interface)
+                    if(args.collection != None):
+                        #If the user did not select to include watched movies with --include-watched
+                        logger.debug(f'\nExcluding Watched Movies...\n')
+                        all_movies_from_provided_sections = all_movies_from_provided_sections + plex.library.section(provided_section).search(collection=args.collection, unwatched=True)
+                        logger.debug(f'\nall_movies_from_provided_sections -- including only items containing collection \"{args.collection}\" = {all_movies_from_provided_sections}')
+                    else:
+                        #If the user did not select to include watched movies with --include-watched
+                        logger.debug(f'\nExcluding Watched Movies...\n')
+                        all_movies_from_provided_sections = all_movies_from_provided_sections + plex.library.section(provided_section).all(unwatched=True)
+                        logger.debug(f'\nall_movies_from_provided_sections = {all_movies_from_provided_sections}')
 
                 logger.debug(f'\nall_movies_from_provided_sections = {all_movies_from_provided_sections}')
                 
@@ -207,9 +298,9 @@ def get_random_episodes_or_movies(plex, all_provided_sections, requested_playlis
                 continue
             if args.include_watched is True:
                 #Grab Watched Episodes but ignore Season 0 (Specials)
-                show_episodes[show.title] = show.episodes(parentIndex__gt=0)
+                show_episodes[show.title] = show.episodes(parentIndex__gt=startSeasonFrom)
             else:
-                show_episodes[show.title] = show.unwatched()
+                show_episodes[show.title] = show.episodes(viewCount=unwatched, parentIndex__gt=startSeasonFrom)
               
 
             #Get the Season number of the Show
@@ -504,53 +595,55 @@ def build_playlist(plex, userName, plex_refined_library_sections, selectionsToEx
             print(f'Error - Unable to generate the Playlist \"{args.name}\"')
             exit(1)
 
-        #Print the Episode added to the playlist
-        for episode_movie in episode_or_movie:
-            #If the media type is show then print the output for the show details
-            if episode_movie.TYPE in getShow:
-                print('\n-----------------------------------')
-                print('[RANDOMIZED EPISODES]')
-                print(f'Username: {userName}')
-                print(f'Library Selection: {episode_movie.librarySectionTitle}')  
+        #If the User used the --skip-printout argument then skip printing the playlist out to the console.
+        if(args.skip_printout != True):
+            #Print the Episode added to the playlist
+            for episode_movie in episode_or_movie:
+                #If the media type is show then print the output for the show details
+                if episode_movie.TYPE in getShow:
+                    print('\n-----------------------------------')
+                    print('[RANDOMIZED EPISODES]')
+                    print(f'Username: {userName}')
+                    print(f'Library Selection: {episode_movie.librarySectionTitle}')  
 
-                #If no library sections are to be excluded print None for the excluded Library sections
-                if (not selectionsToExclude_List) or (args.exclude_library == ''):
-                    print(f'\nExcluded Library Sections: None')
+                    #If no library sections are to be excluded print None for the excluded Library sections
+                    if (not selectionsToExclude_List) or (args.exclude_library == ''):
+                        print(f'\nExcluded Library Sections: None')
 
-                else:
-                    #Remove Empty strings from the list
-                    selectionsToExclude_List = list(filter(None, selectionsToExclude_List))
-                    print(f'\nExcluded Library Sections: {selectionsToExclude_List}')
-        
-                season_episode = episode_movie.seasonEpisode
-                logger.debug(f'\n\nEpisode [label] = {(episode_movie.TYPE)}\n\n')
-                print(f'\nAdded to Playlist [{args.name}]: \"{episode_movie.grandparentTitle} - {episode_movie.parentTitle} - '
-                      f'Ep.0{episode_movie.index} - {episode_movie.title}\"')
-                  
-                libraryCount += 1
-                print(f'Number of Items in Playlist: {libraryCount}\n')
-                
-            #If the media type is movie then print the output for the movie details
-            elif episode_movie.TYPE in getMovie:
-                print('\n-----------------------------------')
-                print('[RANDOMIZED MOVIES]')
-                print(f'Username: {userName}')
-                print(f'Library Selection: {episode_movie.librarySectionTitle}')
-                
-                #If no library sections are to be excluded print None for the excluded Library sections
-                if (not selectionsToExclude_List) or (args.exclude_library == ''):
-                    print(f'\nExcluded Library Sections: None')
+                    else:
+                        #Remove Empty strings from the list
+                        selectionsToExclude_List = list(filter(None, selectionsToExclude_List))
+                        print(f'\nExcluded Library Sections: {selectionsToExclude_List}')
+            
+                    season_episode = episode_movie.seasonEpisode
+                    logger.debug(f'\n\nEpisode [label] = {(episode_movie.TYPE)}\n\n')
+                    print(f'\nAdded to Playlist [{args.name}]: \"{episode_movie.grandparentTitle} - {episode_movie.parentTitle} - '
+                          f'Ep.0{episode_movie.index} - {episode_movie.title}\"')
+                      
+                    libraryCount += 1
+                    print(f'Number of Items in Playlist: {libraryCount}\n')
+                    
+                #If the media type is movie then print the output for the movie details
+                elif episode_movie.TYPE in getMovie:
+                    print('\n-----------------------------------')
+                    print('[RANDOMIZED MOVIES]')
+                    print(f'Username: {userName}')
+                    print(f'Library Selection: {episode_movie.librarySectionTitle}')
+                    
+                    #If no library sections are to be excluded print None for the excluded Library sections
+                    if (not selectionsToExclude_List) or (args.exclude_library == ''):
+                        print(f'\nExcluded Library Sections: None')
 
-                else:
-                    #Remove Empty strings from the list
-                    selectionsToExclude_List = list(filter(None, selectionsToExclude_List))
-                    print(f'\nExcluded Library Sections: {selectionsToExclude_List}')
+                    else:
+                        #Remove Empty strings from the list
+                        selectionsToExclude_List = list(filter(None, selectionsToExclude_List))
+                        print(f'\nExcluded Library Sections: {selectionsToExclude_List}')
 
-                logger.debug(f'\n\nMovie [label] = {(episode_movie.TYPE)}\n\n')
-                print(f'\nAdded to Playlist [{args.name}]: \"{episode_movie.title}\"')
-                
-                libraryCount += 1
-                print(f'Number of Items in Playlist: {libraryCount}\n')
+                    logger.debug(f'\n\nMovie [label] = {(episode_movie.TYPE)}\n\n')
+                    print(f'\nAdded to Playlist [{args.name}]: \"{episode_movie.title}\"')
+                    
+                    libraryCount += 1
+                    print(f'Number of Items in Playlist: {libraryCount}\n')
 
 
     #For TV Shows Only
@@ -577,31 +670,33 @@ def build_playlist(plex, userName, plex_refined_library_sections, selectionsToEx
             exit(1)
         
 
-        #Print the Episode added to the playlist
-        for episode_movie in episode_or_movie:
-            #If the media type is show then print the output for the show details
-            if episode_movie.TYPE in getShow:
-                print('\n-----------------------------------')
-                print('[RANDOMIZED EPISODES]')
-                print(f'Username: {userName}')
-                print(f'Library Selection: {episode_movie.librarySectionTitle}')  
+        #If the User used the --skip-printout argument then skip printing the playlist out to the console.
+        if(args.skip_printout != True):
+            #Print the Episode added to the playlist
+            for episode_movie in episode_or_movie:
+                #If the media type is show then print the output for the show details
+                if episode_movie.TYPE in getShow:
+                    print('\n-----------------------------------')
+                    print('[RANDOMIZED EPISODES]')
+                    print(f'Username: {userName}')
+                    print(f'Library Selection: {episode_movie.librarySectionTitle}')  
 
-                #If no library sections are to be excluded print None for the excluded Library sections
-                if (not selectionsToExclude_List) or (args.exclude_library == ''):
-                    print(f'\nExcluded Library Sections: None')
+                    #If no library sections are to be excluded print None for the excluded Library sections
+                    if (not selectionsToExclude_List) or (args.exclude_library == ''):
+                        print(f'\nExcluded Library Sections: None')
 
-                else:
-                    #Remove Empty strings from the list
-                    selectionsToExclude_List = list(filter(None, selectionsToExclude_List))
-                    print(f'\nExcluded Library Sections: {selectionsToExclude_List}')
-        
-                logger.debug(f'\n\nEpisode [label] = {(episode_movie.TYPE)}\n\n')
-                season_episode = episode_movie.seasonEpisode      
-                print(f'\nAdded to Playlist [{args.name}]: \"{episode_movie.grandparentTitle} - {episode_movie.parentTitle} - '
-                      f'Ep.0{episode_movie.index} - {episode_movie.title}\"')
-                  
-                libraryCount += 1
-                print(f'Number of Items in Playlist: {libraryCount}\n')
+                    else:
+                        #Remove Empty strings from the list
+                        selectionsToExclude_List = list(filter(None, selectionsToExclude_List))
+                        print(f'\nExcluded Library Sections: {selectionsToExclude_List}')
+            
+                    logger.debug(f'\n\nEpisode [label] = {(episode_movie.TYPE)}\n\n')
+                    season_episode = episode_movie.seasonEpisode      
+                    print(f'\nAdded to Playlist [{args.name}]: \"{episode_movie.grandparentTitle} - {episode_movie.parentTitle} - '
+                          f'Ep.0{episode_movie.index} - {episode_movie.title}\"')
+                      
+                    libraryCount += 1
+                    print(f'Number of Items in Playlist: {libraryCount}\n')
 
            
     #For Movies Only      
@@ -628,29 +723,31 @@ def build_playlist(plex, userName, plex_refined_library_sections, selectionsToEx
             exit(1)
 
         
-        #Print the Episode added to the playlist
-        for episode_movie in episode_or_movie:
-            #If the media type is movie then print the output for the movie details
-            if episode_movie.TYPE in getMovie:
-                print('\n-----------------------------------')
-                print('[RANDOMIZED MOVIES]')
-                print(f'Username: {userName}')
-                print(f'Library Selection: {episode_movie.librarySectionTitle}')
-                
-                #If no library sections are to be excluded print None for the excluded Library sections
-                if (not selectionsToExclude_List) or (args.exclude_library == ''):
-                    print(f'\nExcluded Library Sections: None')
+        #If the User used the --skip-printout argument then skip printing the playlist out to the console.
+        if(args.skip_printout != True):
+            #Print the Episode added to the playlist
+            for episode_movie in episode_or_movie:
+                #If the media type is movie then print the output for the movie details
+                if episode_movie.TYPE in getMovie:
+                    print('\n-----------------------------------')
+                    print('[RANDOMIZED MOVIES]')
+                    print(f'Username: {userName}')
+                    print(f'Library Selection: {episode_movie.librarySectionTitle}')
+                    
+                    #If no library sections are to be excluded print None for the excluded Library sections
+                    if (not selectionsToExclude_List) or (args.exclude_library == ''):
+                        print(f'\nExcluded Library Sections: None')
 
-                else:
-                    #Remove Empty strings from the list
-                    selectionsToExclude_List = list(filter(None, selectionsToExclude_List))
-                    print(f'\nExcluded Library Sections: {selectionsToExclude_List}')
+                    else:
+                        #Remove Empty strings from the list
+                        selectionsToExclude_List = list(filter(None, selectionsToExclude_List))
+                        print(f'\nExcluded Library Sections: {selectionsToExclude_List}')
 
-                logger.debug(f'\n\nMovie [label] = {(episode_movie.TYPE)}\n\n')
-                print(f'\nAdded to Playlist [{args.name}]: \"{episode_movie.title}\"')
-                
-                libraryCount += 1
-                print(f'Number of Items in Playlist: {libraryCount}\n')
+                    logger.debug(f'\n\nMovie [label] = {(episode_movie.TYPE)}\n\n')
+                    print(f'\nAdded to Playlist [{args.name}]: \"{episode_movie.title}\"')
+                    
+                    libraryCount += 1
+                    print(f'Number of Items in Playlist: {libraryCount}\n')
 
 
 
@@ -798,7 +895,6 @@ def create_playlist(plex, account):
     loopCount = 0  
     
     for library in plex_all_library_sections:
-
         #Use a regex to match exactly the library sections, otherwise it will find any library containing the library variable 
         library_exact_matcher_regex = '^' + re.escape(library) + '$'
         library_regex = re.compile(library_exact_matcher_regex)
@@ -1366,6 +1462,14 @@ def main():
         print(f'\nERROR - The \"--select-library\" argument cannot be used in conjunction with the \"--allmovies\" argument.\n')
         exit(1)
     
+    #If the collections argument is used, then one of the following arguments must not be empty: args.allshows, args.allmovies, args.select_library
+    if(args.collection != None) and (args.select_library == None) and (args.allshows == False) and (args.allmovies == False):
+        #print(f'\ncollection = \"{args.collection}\"\nselect_library = \"{args.select_library}\"\nallshows = \"{args.allshows}\"\nallmovies = \"{args.allmovies}\"\n')
+        print('\nERROR - The \"--collection\" argument MUST be used in conjuction with at least one of the following arguments:')
+        print(f'        --select-library\n        --allshows\n        --allmovies\n')
+        time.sleep(3)
+        exit(1)
+    
     #If the user does not provide a user to apply the playlist creation/deletion to, print an Error, and exit.
     if(args.adminuser != True) and (args.homeusers == None):
         print(f'\nERROR - The script requires the use of at least one User.\n\nAvailable options:\n [1] - adminuser (--adminuser) \n [2] - homeusers (--homeusers "Username1,Username2,...")\n')
@@ -1377,6 +1481,8 @@ def main():
         print(f'        Rerun your command with one of the following required Arguments:')
         print(f'        --select-library\n        --allshows\n        --allmovies\n        --purge\n')
         time.sleep(3)
+        
+        
         exit(1)
     #If purge argument is used, then it should not be used at the same time as the following arguments: --select-library, --allshows, or --allmovies
     elif((args.select_library != None) or (args.allshows != False) or (args.allmovies != False)) and (args.purge != False):
@@ -1392,7 +1498,7 @@ def main():
     elif(args.name == False):
         print(f'The argument \"--name\" is required and cannot be ommitted.\nPlease provide the name argument and try again.\n')
         exit(1)
-       
+      
     if(args.number > 0):
         #Select home Users
         if(args.homeusers):

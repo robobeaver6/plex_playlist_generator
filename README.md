@@ -5,14 +5,14 @@ series in order
 
 ##Usage
 ```
-usage: plex_playlist_generator.py [-h] [--name NAME] [--number NUMBER] [--debug]
+usage: plex_playlist_generator.py [-h] [--name NAME] [--number NUMBER] [--debug] [--skip-printout]
                                   [--server] [--baseurl BASEURL] [--token TOKEN] [--account]
                                   [--username USERNAME] [--password PASSWORD]
                                   [--resource RESOURCE] [--tvdb-api-key TVDB_API_KEY]
                                   [--ignore-skipped] [--randomize] [--include-watched]
                                   [--allshows] [--allmovies] [--select-library SELECT_LIBRARY]
-                                  [--exclude-library EXCLUDE_LIBRARY] [--purge] [--adminuser]
-                                  [--homeusers HOMEUSERS]
+                                  [--exclude-library EXCLUDE_LIBRARY] [--purge]
+                                  [--collection COLLECTION] [--adminuser] [--homeusers HOMEUSERS]
 
 Create playlist of unwatched episodes from random shows but in correct episode
 order.
@@ -23,6 +23,7 @@ optional arguments:
   --number NUMBER, -n NUMBER
                         Number of episodes or Movies to add to play list
   --debug, -d           Debug Logging
+  --skip-printout       Skip printing the output to the console (will decrease runtime).
 
 Server Connection Method:
   --server              Server connection Method
@@ -53,6 +54,10 @@ Library Selection Behavior:
   --select-library, -l   SELECT_LIBRARY   Choose between library sections of both TV Shows or Movies to build a playlist from (comma seperated within quotes if multiple users)
   --exclude-library, -e  EXCLUDE_LIBRARY  Comma seperated list (if selecting multiple users) of sections to exclude (I.E. "Test Videos,Workout,Home Videos" ) there should be no space between the comma and the first character of the next value
   --purge                Remove a playlist from plex for the provided user(s)
+
+Collections Tag Filter:
+  --collection COLLECTION, -c COLLECTION
+                        Retrieve's items that are part of a Collection matching the name provided to '--collection', and will be applied to each library that the user selected.
 
 User Profile Selection:
   --adminuser, -a        Generate playlist for the Plex Admin user profile name that was used to login.
@@ -109,8 +114,11 @@ Generate 3 random unwatched epsidodes for all home users on the plex server:
 Ignore the fact that not all episodes are available for a show in your library (set by default to reduce processing time)
     `plex_playlist_generator.py --account --username MyUserName --password Sh1tPass --resource MyServer --allshows --adminuser --homeusers "all" --ignore-skipped`
 
-Generate a mix 8 random shows and movies:
-    `plex_playlist_generator.py --server --baseurl "http://172.16.1.100:32400" --token "fR5GrDxfLunKynNub5" --resource MyServer --allmovies --allshows --homeusers John --allmovies --number 8`
+Generate a mix of 8 random shows and movies:
+    `plex_playlist_generator.py --server --baseurl "http://172.16.1.100:32400" --token "fR5GrDxfLunKynNub5" --resource MyServer --allmovies --allshows --homeusers John --number 8`
+
+Generate a mix of 8 random shows and movies that are a part of a collection named "**Christmas**" for the associated Libraries provided:
+    `plex_playlist_generator.py --server --baseurl "http://172.16.1.100:32400" --token "fR5GrDxfLunKynNub5" --resource MyServer --allmovies --allshows --homeusers John --number 8 --collection "Christmas"`
 
 Generate a playlist from the library section "TV Shows" with the name "Test1" for **all** home users:
 `plex_playlist_generator.py --account --username MyUserName --password Sh1tPass --resource MyServer --select-library "TV Shows" --adminuser --homeusers "all" --name "Test1"`
@@ -118,3 +126,5 @@ Generate a playlist from the library section "TV Shows" with the name "Test1" fo
 Delete a playlist with the name "Test1" for **all** home users:
     `plex_playlist_generator.py --account --username MyUserName --password Sh1tPass --resource MyServer --adminuser --homeusers "all" --name "Test1" --purge`
 
+Skip the printout of the playlist to the screen:
+    `plex_playlist_generator.py --account --username MyUserName --password Sh1tPass --resource MyServer --allshows --adminuser --homeusers "all" --skip-printout`
